@@ -573,40 +573,57 @@ function mergePhases(cloudPhases){
   });
 }
 
+function fetchWithTimeout(url, options={}, ms=5000){
+  const controller = new AbortController();
+  const timer = setTimeout(()=>controller.abort(), ms);
+  return fetch(url, {...options, signal:controller.signal})
+    .finally(()=>clearTimeout(timer));
+}
+
 async function loadFromCloud(){
   try{
-    const resp=await fetch(API_BASE+'/latest',{headers:{'X-Master-Key':MASTER_KEY}});
-    const data=await resp.json();
+    const url = `${API_BASE}/latest?t=${Date.now()}`;
+    const resp = await fetchWithTimeout(url, {
+      headers:{'X-Master-Key':MASTER_KEY},
+      cache:'no-store'
+    }, 5000);
+    if(!resp.ok){ console.warn('JSONBin error:', resp.status); return false; }
+    const data = await resp.json();
     if(data.record){
       const rec = data.record;
       if(rec.players) state.players = rec.players;
       if(rec.adminPin) state.adminPin = rec.adminPin;
-
       if(rec.phases && rec.phases.length > 0){
         if(isValidPhaseStructure(rec.phases)){
-          // Estructura correcta — cargar directo
           state.phases = rec.phases;
         } else {
-          // Estructura vieja — migrar conservando resultados
-          console.log('⚠️ Migrando estructura de fases...');
+          console.log('⚠️ Migrando fases...');
           state.phases = mergePhases(rec.phases);
-          // Guardar estructura migrada en la nube
           saveToCloud();
         }
       }
-      // Si phases está vacío, usar DEFAULT_PHASES (ya está en state)
       return true;
     }
-  }catch(e){syncStatus('error','Sin conexión');}
+  }catch(e){
+    if(e.name==='AbortError') syncStatus('error','Timeout — reintentando...');
+    else syncStatus('error','Sin conexión');
+  }
   return false;
 }
 async function saveToCloud(){
   syncStatus('saving','Guardando...');
   try{
-    const resp=await fetch(API_BASE,{method:'PUT',headers:{'Content-Type':'application/json','X-Master-Key':MASTER_KEY},body:JSON.stringify(state)});
-    if(resp.ok)syncStatus('ok','Guardado ✓');
+    const resp = await fetchWithTimeout(API_BASE, {
+      method:'PUT',
+      headers:{'Content-Type':'application/json','X-Master-Key':MASTER_KEY},
+      body:JSON.stringify(state)
+    }, 8000);
+    if(resp.ok) syncStatus('ok','Guardado ✓');
     else syncStatus('error','Error al guardar');
-  }catch(e){syncStatus('error','Sin conexión');}
+  }catch(e){
+    if(e.name==='AbortError') syncStatus('error','Timeout al guardar');
+    else syncStatus('error','Sin conexión');
+  }
 }
 function scheduleSave(){if(saveTimer)clearTimeout(saveTimer);saveTimer=setTimeout(saveToCloud,900);}
 function startPolling(){
