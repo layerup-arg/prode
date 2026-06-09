@@ -298,14 +298,12 @@ const API_BASE  = 'https://api.jsonbin.io/v3/b/' + BIN_ID;
 // ============================================================
 //  FOOTBALL-DATA.ORG — auto resultados
 // ============================================================
-const FD_TOKEN    = '5ff3a00a134a4a3bb424e2420b88db91';
-const FD_BASE     = 'https://api.football-data.org/v4';
-const FD_PROXY    = url => `https://corsproxy.io/?${encodeURIComponent(url)}`;
-const WC_CODE     = 'WC';   // FIFA World Cup
-let   autoSyncTimer = null;
-const AUTO_SYNC_INTERVAL = 2 * 60 * 1000; // cada 2 minutos
+const FD_TOKEN = '5ff3a00a134a4a3bb424e2420b88db91';
+const FD_BASE  = 'https://api.football-data.org/v4';
+const FD_PROXY = url => `https://corsproxy.io/?${encodeURIComponent(url)}`;
+const WC_CODE  = 'WC';
 
-// Mapa nombre del equipo en nuestra app → nombre en football-data.org
+// Mapa nombre → inglés para la API
 const TEAM_NAME_MAP = {
   'México':'Mexico','Ecuador':'Ecuador','Qatar':'Qatar','Senegal':'Senegal',
   'Estados Unidos':'USA','Países Bajos':'Netherlands','Panamá':'Panama','Angola':'Angola',
@@ -319,103 +317,27 @@ const TEAM_NAME_MAP = {
   'Rumania':'Romania','Argelia':'Algeria','Perú':'Peru','República Checa':'Czechia',
   'Venezuela':'Venezuela','Irak':'Iraq','Kenia':'Kenya','Dinamarca':'Denmark',
 };
-
 function normalizeName(name){
   return (name||'').toLowerCase().replace(/[áàä]/g,'a').replace(/[éèë]/g,'e')
     .replace(/[íìï]/g,'i').replace(/[óòö]/g,'o').replace(/[úùü]/g,'u')
     .replace(/ñ/g,'n').replace(/ç/g,'c').replace(/\s+/g,' ').trim();
 }
-
 function teamsMatch(apiName, ourName){
   const mapped = TEAM_NAME_MAP[ourName] || ourName;
-  const n1 = normalizeName(apiName);
-  const n2 = normalizeName(mapped);
-  return n1===n2 || n1.includes(n2) || n2.includes(n1);
+  return normalizeName(apiName)===normalizeName(mapped)
+    || normalizeName(apiName).includes(normalizeName(mapped))
+    || normalizeName(mapped).includes(normalizeName(apiName));
 }
-
 async function fetchWCMatches(){
   try{
-    const url = `${FD_BASE}/competitions/${WC_CODE}/matches`;
-    const resp = await fetch(FD_PROXY(url), {
-      headers:{'X-Auth-Token': FD_TOKEN}
+    const resp = await fetch(FD_PROXY(`${FD_BASE}/competitions/${WC_CODE}/matches`),{
+      headers:{'X-Auth-Token':FD_TOKEN}
     });
-    if(!resp.ok){ console.warn('football-data error:', resp.status); return null; }
+    if(!resp.ok) return null;
     const data = await resp.json();
     return data.matches || [];
-  }catch(e){ console.warn('football-data fetch error:', e); return null; }
-}
-
-async function autoSyncResults(){
-  // Check if there's anything pending across all phases
-  const anyPending = state.phases.some(ph => ph.matches.some(m => !m.result));
-  if(!anyPending) return;
-
-  const apiMatches = await fetchWCMatches();
-  if(!apiMatches) return;
-
-  // Build lookup by fdId for fast access
-  const byFdId = {};
-  for(const am of apiMatches) byFdId[am.id] = am;
-
-  let changed = false;
-
-  for(const ph of state.phases){
-    for(const m of ph.matches){
-      if(m.result) continue; // ya tiene resultado
-
-      let apiM = null;
-
-      if(m.fdId){
-        // Knockout: buscar por ID directo
-        apiM = byFdId[m.fdId];
-        // Actualizar nombres de equipos si la API ya los conoce
-        if(apiM && apiM.homeTeam?.name && apiM.awayTeam?.name){
-          const apiHome = apiM.homeTeam.name;
-          const apiAway = apiM.awayTeam.name;
-          // Traducir nombre API → español si tenemos el mapeo inverso
-          const toSpanish = name => {
-            const entry = Object.entries(TEAM_NAME_MAP).find(([es,en])=>en===name||normalizeName(en)===normalizeName(name));
-            return entry ? entry[0] : name;
-          };
-          const newHome = toSpanish(apiHome);
-          const newAway = toSpanish(apiAway);
-          if(newHome !== m.home || newAway !== m.away){
-            m.home = newHome;
-            m.away = newAway;
-            changed = true;
-          }
-        }
-      } else {
-        // Fase de grupos: buscar por nombre de equipo
-        const finished = apiMatches.filter(x=>x.status==='FINISHED');
-        apiM = finished.find(am=>
-          teamsMatch(am.homeTeam?.name, m.home) &&
-          teamsMatch(am.awayTeam?.name, m.away)
-        );
-      }
-
-      if(apiM && apiM.status==='FINISHED' && apiM.score?.fullTime){
-        const home = apiM.score.fullTime.home;
-        const away = apiM.score.fullTime.away;
-        if(home!==null && away!==null){
-          m.result = {home, away};
-          changed = true;
-          console.log(`✅ Auto-resultado: ${m.home} ${home}-${away} ${m.away}`);
-        }
-      }
-    }
-  }
-
-  if(changed){
-    syncStatus('saving','Actualizando resultados...');
-    await saveToCloud();
-    render();
-    syncStatus('ok','Resultados actualizados ✓');
-  }
-}
-
-
-// ============================================================
+  }catch(e){ return null; }
+}// ============================================================
 //  FLAG MAP — iso2 codes for flagcdn.com
 // ============================================================
 const FLAG_MAP = {
@@ -688,11 +610,8 @@ async function saveToCloud(){
 }
 function scheduleSave(){if(saveTimer)clearTimeout(saveTimer);saveTimer=setTimeout(saveToCloud,900);}
 function startPolling(){
-  // Sync de estado entre dispositivos cada 12s
-  setInterval(async()=>{const u=await loadFromCloud();if(u)render();},12000);
-  // Auto-resultados desde football-data.org cada 2 min (primer check a los 10s para no bloquear inicio)
-  setTimeout(autoSyncResults, 10000);
-  autoSyncTimer = setInterval(autoSyncResults, AUTO_SYNC_INTERVAL);
+  // Sync entre dispositivos cada 15s — solo lee, no llama a APIs externas
+  setInterval(async()=>{const u=await loadFromCloud();if(u)render();},15000);
 }
 
 // ============================================================
@@ -1009,8 +928,8 @@ function renderAdmin(){
   }
   return renderHeader('Panel de administración')+renderNav()+
   `<div class="section">
-    <div class="section-title"><span class="accent" style="background:var(--green)"></span>⚽ Resultados automáticos</div>
-    <p style="font-size:13px;color:var(--muted);margin-bottom:1rem;line-height:1.6">Los resultados se sincronizan automáticamente desde <strong style="color:#fff">football-data.org</strong> cada 2 minutos. También podés forzarlo manualmente.</p>
+    <div class="section-title"><span class="accent" style="background:var(--green)"></span>⚽ Actualizar resultados</div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:1rem;line-height:1.6">Consultá <strong style="color:#fff">football-data.org</strong> para traer los resultados finalizados y guardarlos en la nube. Los jugadores los ven al instante.</p>
     <div class="btn-row" style="margin-top:0">
       <button class="btn primary" data-action="forceSyncResults">⚡ Actualizar resultados ahora</button>
     </div>
