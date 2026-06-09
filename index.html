@@ -222,6 +222,15 @@ body{font-family:'Barlow',sans-serif;background:var(--dark);color:var(--light);m
   .score-col-value{font-size:18px}
   .match-done-team .team-name{font-size:12px}
 }
+/* ===== PIN INPUTS ===== */
+.pin-inputs{display:flex;gap:10px;justify-content:center}
+.pin-digit{width:52px;height:60px;text-align:center;border:2px solid var(--border);border-radius:10px;font-size:28px;font-weight:900;background:rgba(255,255,255,.06);color:#fff;font-family:'Barlow Condensed',sans-serif;transition:all .15s;caret-color:transparent}
+.pin-digit:focus{outline:none;border-color:var(--yellow);background:rgba(255,209,0,.08);box-shadow:0 0 0 3px rgba(255,209,0,.15)}
+.pin-digit.filled{border-color:rgba(255,255,255,.3)}
+.pin-digit.shake{border-color:var(--red)!important;background:rgba(232,0,29,.08)!important;animation:shake .35s ease}
+.pin-error{color:#ff6b7a;font-size:13px;font-weight:600;margin-top:.75rem;font-family:'Barlow Condensed',sans-serif;letter-spacing:.3px;text-align:center}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
+
 .info-btn{padding:5px 14px;border-radius:999px;border:1px solid rgba(255,209,0,.4);background:rgba(255,209,0,.1);color:var(--yellow);font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;transition:all .15s;margin-left:4px}
 .info-btn:hover{background:rgba(255,209,0,.2);border-color:var(--yellow)}
 
@@ -653,7 +662,7 @@ function formatDate(dtStr){
 // ============================================================
 //  VIEW STATE
 // ============================================================
-let view='home',currentPlayer=null,currentPhase='grupos',adminAuthed=false,modalOpen=null;
+let view='home',currentPlayer=null,currentPhase='grupos',adminAuthed=false,modalOpen=null,pinError='';
 
 // ============================================================
 //  RENDER
@@ -663,6 +672,7 @@ function render(){
   let html='';
   if(modalOpen==='addPlayer')html+=renderAddPlayerModal();
   if(modalOpen==='scoringInfo')html+=renderScoringInfoModal();
+  if(modalOpen==='playerPin')html+=renderPlayerPinModal();
   if(view==='home')html+=renderHome();
   else if(view==='player')html+=renderPlayer();
   else if(view==='leaderboard')html+=renderLeaderboard();
@@ -695,9 +705,10 @@ function renderNav(){
 function renderHome(){
   const lb=getLeaderboard();
   const ptsMap=Object.fromEntries(lb.map(p=>[p.id,p.pts]));
-  return renderHeader('Elegí tu nombre para cargar tu pronóstico')+renderNav()+
+  return renderHeader('Seleccioná tu nombre e ingresá tu PIN')+renderNav()+
   `<div class="section">
     <div class="section-title"><span class="accent" style="background:var(--yellow)"></span>Jugadores <span class="badge badge-muted">${state.players.length}</span></div>
+    ${state.players.length===0?`<div class="empty">El administrador todavía no creó jugadores.</div>`:`
     <div class="players-grid">
       ${state.players.map(p=>{
         const pal=playerPalette(p.name);
@@ -710,15 +721,9 @@ function renderHome(){
           </div>
         </div>`;
       }).join('')}
-      <div class="player-card player-add-card" data-action="openAddPlayer">
-        <div class="player-card-inner">
-          <div class="player-avatar" style="background:rgba(255,255,255,.06);border:2px dashed rgba(255,255,255,.2);color:var(--muted);font-size:28px;font-weight:400">+</div>
-          <div class="player-card-name" style="color:var(--muted)">Agregar</div>
-        </div>
-      </div>
-    </div>
+    </div>`}
   </div>
-  <p class="tip">Tocá tu nombre para ver y editar tus pronósticos · Se sincronizan en todos los dispositivos</p>`;
+  <p class="tip">🔒 Cada jugador tiene un PIN de 4 dígitos asignado por el admin para ingresar</p>`;
 }
 
 function renderPlayer(){
@@ -910,13 +915,23 @@ function renderAdmin(){
     </div>
   </div>
   <div class="section">
-    <div class="section-title"><span class="accent" style="background:var(--red)"></span>Jugadores</div>
-    ${state.players.map(p=>`
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border)">
-        <span style="font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:800;text-transform:uppercase;color:#fff">${esc(p.name)}</span>
-        <button class="btn danger sm" data-action="deletePlayer" data-pid="${p.id}">Eliminar</button>
-      </div>`).join('')}
-    ${state.players.length===0?'<div class="empty">Sin jugadores</div>':''}
+    <div class="section-title"><span class="accent" style="background:var(--red)"></span>Jugadores <button class="info-btn" data-action="openAddPlayer">+ Nuevo jugador</button></div>
+    ${state.players.length===0?'<div class="empty">Sin jugadores todavía</div>':
+      state.players.map(p=>{
+        const pal=playerPalette(p.name);
+        return`<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
+          <div style="width:36px;height:36px;border-radius:50%;background:${pal.bg};color:${pal.text};display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;flex-shrink:0">${initials(p.name)}</div>
+          <div style="flex:1">
+            <div style="font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:800;text-transform:uppercase;color:#fff">${esc(p.name)}</div>
+            <div style="font-size:11px;color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-weight:600;letter-spacing:.3px;margin-top:2px">PIN: ${p.pin?'••••':' sin PIN asignado'}</div>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="btn sm" data-action="changePlayerPin" data-pid="${p.id}" style="font-size:11px">Cambiar PIN</button>
+            <button class="btn danger sm" data-action="deletePlayer" data-pid="${p.id}">Eliminar</button>
+          </div>
+        </div>`;
+      }).join('')
+    }
   </div>
   <div class="section">
     <div class="section-title"><span class="accent" style="background:var(--purple)"></span>Configuración</div>
@@ -1038,14 +1053,46 @@ function renderScoringInfoModal(){
   </div>`;
 }
 
+function renderPlayerPinModal(){
+  const player = state.players.find(p=>p.id===currentPlayer);
+  if(!player) return '';
+  const pal = playerPalette(player.name);
+  return`<div class="overlay" id="overlay">
+    <div class="modal" style="max-width:320px;text-align:center">
+      <div style="width:64px;height:64px;border-radius:50%;background:${pal.bg};color:${pal.text};display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-size:24px;font-weight:900;margin:0 auto 1rem;border:3px solid rgba(255,255,255,.2)">${initials(player.name)}</div>
+      <h2 style="text-align:center;margin-bottom:.25rem">${esc(player.name)}</h2>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:1.25rem;font-weight:500">Ingresá tu PIN de 4 dígitos</p>
+      <div class="pin-inputs" id="pin-inputs">
+        <input class="pin-digit" type="password" inputmode="numeric" maxlength="1" pattern="[0-9]" data-idx="0">
+        <input class="pin-digit" type="password" inputmode="numeric" maxlength="1" pattern="[0-9]" data-idx="1">
+        <input class="pin-digit" type="password" inputmode="numeric" maxlength="1" pattern="[0-9]" data-idx="2">
+        <input class="pin-digit" type="password" inputmode="numeric" maxlength="1" pattern="[0-9]" data-idx="3">
+      </div>
+      ${pinError?`<div class="pin-error">${pinError}</div>`:''}
+      <div class="btn-row" style="margin-top:1.25rem;justify-content:center">
+        <button class="btn primary" data-action="confirmPlayerPin" style="flex:1">Ingresar</button>
+        <button class="btn" data-action="closeModal">Cancelar</button>
+      </div>
+    </div>
+  </div>`;
+}
+
 function renderAddPlayerModal(){
   return`<div class="overlay" id="overlay">
-    <div class="modal">
-      <h2>Agregar jugador</h2>
+    <div class="modal" style="max-width:340px">
+      <h2>Nuevo jugador</h2>
       <label class="label">Nombre o apodo</label>
       <input class="input" id="new-player-name" type="text" placeholder="Ej: Mamá, El Tío, Juan..." maxlength="30" style="margin-bottom:1rem" autofocus>
+      <label class="label">PIN de 4 dígitos</label>
+      <div class="pin-inputs" id="pin-inputs-admin" style="justify-content:flex-start;margin-bottom:1rem">
+        <input class="pin-digit" type="password" inputmode="numeric" maxlength="1" pattern="[0-9]" data-idx="a0">
+        <input class="pin-digit" type="password" inputmode="numeric" maxlength="1" pattern="[0-9]" data-idx="a1">
+        <input class="pin-digit" type="password" inputmode="numeric" maxlength="1" pattern="[0-9]" data-idx="a2">
+        <input class="pin-digit" type="password" inputmode="numeric" maxlength="1" pattern="[0-9]" data-idx="a3">
+      </div>
+      <p class="tip" style="margin-bottom:1rem">El jugador usará este PIN para acceder a sus pronósticos.</p>
       <div class="btn-row" style="margin-top:0">
-        <button class="btn primary" data-action="confirmAddPlayer">Agregar</button>
+        <button class="btn primary" data-action="confirmAddPlayer">Crear jugador</button>
         <button class="btn" data-action="closeModal">Cancelar</button>
       </div>
     </div>
@@ -1075,38 +1122,108 @@ function bindEvents(){
   if(pf)pf.addEventListener('keydown',e=>{if(e.key==='Enter')doAdminLogin();});
   const nf=document.getElementById('new-player-name');
   if(nf)nf.addEventListener('keydown',e=>{if(e.key==='Enter')confirmAddPlayer();});
+
+  // PIN digit navigation — player login and admin add-player
+  document.querySelectorAll('.pin-digit').forEach(input=>{
+    input.addEventListener('input',e=>{
+      const v=e.target.value.replace(/\D/g,'');
+      e.target.value=v?v[0]:'';
+      if(v) e.target.classList.add('filled');
+      else e.target.classList.remove('filled');
+      // auto-advance
+      const idx=parseInt(e.target.dataset.idx);
+      if(v){
+        const next=document.querySelector(`.pin-digit[data-idx="${isNaN(idx)?'a'+(parseInt(e.target.dataset.idx.replace('a',''))+1):idx+1}"]`);
+        if(next) next.focus();
+        else if(!isNaN(idx)) confirmPlayerPin(); // auto-submit on last digit
+      }
+    });
+    input.addEventListener('keydown',e=>{
+      if(e.key==='Backspace'&&!e.target.value){
+        const idx=e.target.dataset.idx;
+        const prevIdx=isNaN(parseInt(idx))
+          ? 'a'+(parseInt(idx.replace('a',''))-1)
+          : parseInt(idx)-1;
+        const prev=document.querySelector(`.pin-digit[data-idx="${prevIdx}"]`);
+        if(prev){prev.value='';prev.classList.remove('filled');prev.focus();}
+      }
+      if(e.key==='Enter') confirmPlayerPin();
+    });
+    // Select all on focus for easy overwrite
+    input.addEventListener('focus',()=>input.select());
+  });
+
   const ov=document.getElementById('overlay');
-  if(ov)ov.addEventListener('click',e=>{if(e.target===ov){modalOpen=null;render();}});
+  if(ov)ov.addEventListener('click',e=>{if(e.target===ov){modalOpen=null;currentPlayer=null;pinError='';render();}});
   const ovs=document.getElementById('overlay-scoring');
   if(ovs)ovs.addEventListener('click',e=>{if(e.target===ovs){modalOpen=null;render();}});
 }
 
 function handleAction(){
   const a=this.dataset.action;
-  if(a==='selectPlayer'){currentPlayer=this.dataset.pid;view='player';render();}
+  if(a==='selectPlayer'){
+    currentPlayer=this.dataset.pid;
+    pinError='';
+    modalOpen='playerPin';
+    render();
+    setTimeout(()=>document.querySelector('.pin-digit')?.focus(),30);
+  }
+  else if(a==='confirmPlayerPin'){confirmPlayerPin();}
   else if(a==='openAddPlayer'){modalOpen='addPlayer';render();setTimeout(()=>{document.getElementById('new-player-name')?.focus();},30);}
   else if(a==='openScoringInfo'){modalOpen='scoringInfo';render();}
   else if(a==='closeScoringInfo'){modalOpen=null;render();}
-  else if(a==='closeModal'){modalOpen=null;render();}
+  else if(a==='closeModal'){modalOpen=null;currentPlayer=null;pinError='';render();}
   else if(a==='confirmAddPlayer'){confirmAddPlayer();}
-  else if(a==='goHome'){view='home';render();}
+  else if(a==='goHome'){view='home';currentPlayer=null;render();}
   else if(a==='doAdminLogin'){doAdminLogin();}
   else if(a==='saveResults'){saveResults();}
   else if(a==='forceSyncResults'){forceSyncResults();}
   else if(a==='lockPhase'){setPhaseLock(true);}
   else if(a==='unlockPhase'){setPhaseLock(false);}
   else if(a==='deletePlayer'){deletePlayer(this.dataset.pid);}
+  else if(a==='changePlayerPin'){changePlayerPin(this.dataset.pid);}
   else if(a==='savePin'){savePin();}
   else if(a==='resetResults'){resetResults();}
+}
+
+function getPinValue(prefix=''){
+  // Reads 4 pin-digit inputs. prefix='' for player login, prefix='a' for admin add-player
+  return [0,1,2,3].map(i=>{
+    const el=document.querySelector(`.pin-digit[data-idx="${prefix}${i}"]`);
+    return el?el.value:'';
+  }).join('');
+}
+
+function confirmPlayerPin(){
+  const player=state.players.find(p=>p.id===currentPlayer);
+  if(!player) return;
+  const entered=getPinValue('');
+  if(entered.length<4){ pinError='Ingresá los 4 dígitos'; render(); setTimeout(()=>document.querySelector('.pin-digit')?.focus(),30); return; }
+  if(entered===String(player.pin)){
+    modalOpen=null; pinError=''; view='player'; render();
+  } else {
+    pinError='PIN incorrecto. Intentá de nuevo.';
+    render();
+    // shake animation
+    setTimeout(()=>{
+      document.querySelectorAll('.pin-digit').forEach(d=>{d.classList.add('shake');d.value='';d.classList.remove('filled');});
+      setTimeout(()=>{
+        document.querySelectorAll('.pin-digit').forEach(d=>d.classList.remove('shake'));
+        document.querySelector('.pin-digit')?.focus();
+      },400);
+    },30);
+  }
 }
 
 function confirmAddPlayer(){
   const inp=document.getElementById('new-player-name');
   const name=(inp?inp.value:'').trim();
-  if(!name)return;
-  if(state.players.find(p=>p.name.toLowerCase()===name.toLowerCase())){alert('Ya existe un jugador con ese nombre.');return;}
-  state.players.push({id:'p'+Date.now(),name,predictions:{}});
-  modalOpen=null;render();scheduleSave();
+  if(!name){ alert('Ingresá un nombre.'); return; }
+  if(state.players.find(p=>p.name.toLowerCase()===name.toLowerCase())){ alert('Ya existe un jugador con ese nombre.'); return; }
+  const pin=getPinValue('a');
+  if(pin.length<4){ alert('Asigná un PIN de 4 dígitos.'); return; }
+  state.players.push({id:'p'+Date.now(), name, pin, predictions:{}});
+  modalOpen=null; render(); scheduleSave();
 }
 function doAdminLogin(){
   const f=document.getElementById('admin-pin-field');
@@ -1162,6 +1279,18 @@ function saveResults(){
   if(btn){const o=btn.textContent;btn.textContent='✅ Guardado';setTimeout(()=>{btn.textContent=o;},1500);}
 }
 function setPhaseLock(lock){const ph=getPhase(currentPhase);if(ph){ph.locked=lock;render();scheduleSave();}}
+function changePlayerPin(pid){
+  const player=state.players.find(p=>p.id===pid);
+  if(!player) return;
+  const newPin=prompt(`Nuevo PIN de 4 dígitos para ${player.name}:`);
+  if(newPin===null) return;
+  if(!/^\d{4}$/.test(newPin)){ alert('El PIN debe ser exactamente 4 dígitos numéricos.'); return; }
+  player.pin=newPin;
+  scheduleSave();
+  render();
+  alert(`✅ PIN de ${player.name} actualizado.`);
+}
+
 function deletePlayer(pid){
   if(!confirm('¿Eliminar este jugador?'))return;
   state.players=state.players.filter(p=>p.id!==pid);render();scheduleSave();
