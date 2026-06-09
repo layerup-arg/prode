@@ -414,12 +414,6 @@ async function autoSyncResults(){
   }
 }
 
-function startAutoSync(){
-  // Primera corrida al cargar (con delay de 3s para no chocar con loadFromCloud)
-  setTimeout(autoSyncResults, 3000);
-  // Luego cada 2 minutos
-  autoSyncTimer = setInterval(autoSyncResults, AUTO_SYNC_INTERVAL);
-}
 
 // ============================================================
 //  FLAG MAP — iso2 codes for flagcdn.com
@@ -696,8 +690,9 @@ function scheduleSave(){if(saveTimer)clearTimeout(saveTimer);saveTimer=setTimeou
 function startPolling(){
   // Sync de estado entre dispositivos cada 12s
   setInterval(async()=>{const u=await loadFromCloud();if(u)render();},12000);
-  // Auto-resultados desde football-data.org cada 2 min
-  startAutoSync();
+  // Auto-resultados desde football-data.org cada 2 min (primer check a los 10s para no bloquear inicio)
+  setTimeout(autoSyncResults, 10000);
+  autoSyncTimer = setInterval(autoSyncResults, AUTO_SYNC_INTERVAL);
 }
 
 // ============================================================
@@ -1452,14 +1447,18 @@ function resetResults(){
 }
 
 // ============================================================
-//  INIT
+//  INIT — render inmediato, nube en background
 // ============================================================
+render(); // mostrar UI al instante con state default
+
 (async()=>{
-  syncStatus('saving','Cargando...');
-  await loadFromCloud();
-  render();
-  syncStatus('ok','Conectado');
-  startPolling();
+  syncStatus('saving','Sincronizando...');
+  const loaded = await loadFromCloud();
+  if(loaded){
+    render(); // re-render con datos reales
+    syncStatus('ok','Conectado');
+  }
+  startPolling(); // polling + auto-sync de resultados en background
 })();
 </script>
 </body>
