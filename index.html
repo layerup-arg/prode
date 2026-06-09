@@ -7,7 +7,7 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --green:#1a472a;--green-light:#2d6a4f;--gold:#f0b429;--gold-dark:#b8861a;
+  --green:#1a472a;--green-light:#2d6a4f;--gold:#f0b429;
   --bg:#f8f9fa;--card:#ffffff;--border:#e2e8f0;--text:#1a202c;--muted:#718096;
   --radius:12px;--radius-sm:8px;
 }
@@ -16,47 +16,33 @@
 }
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
 .app{max-width:860px;margin:0 auto;padding:1rem}
-
-/* HEADER */
 .header{text-align:center;padding:1.5rem 0 1.25rem;border-bottom:1px solid var(--border);margin-bottom:1.5rem}
-.header-badge{display:inline-flex;align-items:center;gap:8px;background:var(--green);color:var(--gold);padding:6px 20px;border-radius:999px;font-size:13px;font-weight:600;margin-bottom:.75rem;letter-spacing:.3px}
+.header-badge{display:inline-flex;align-items:center;gap:8px;background:var(--green);color:var(--gold);padding:6px 20px;border-radius:999px;font-size:13px;font-weight:600;margin-bottom:.75rem}
 .header h1{font-size:28px;font-weight:700;color:var(--text);letter-spacing:-.5px}
 .header p{font-size:14px;color:var(--muted);margin-top:4px}
-
-/* NAV */
 .nav{display:flex;gap:4px;margin-bottom:1.5rem;border-bottom:1px solid var(--border);padding-bottom:.75rem}
 .nav-btn{padding:7px 16px;border-radius:var(--radius-sm);border:none;background:transparent;font-size:13px;cursor:pointer;color:var(--muted);font-family:inherit;font-weight:500;transition:all .15s}
 .nav-btn:hover{color:var(--text);background:var(--border)}
 .nav-btn.active{background:var(--green);color:var(--gold)}
-
-/* SECTION / CARD */
 .section{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem;margin-bottom:1rem}
-.section-title{font-size:15px;font-weight:600;margin-bottom:1rem;display:flex;align-items:center;gap:8px;color:var(--text)}
+.section-title{font-size:15px;font-weight:600;margin-bottom:1rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .badge{font-size:11px;padding:3px 10px;border-radius:999px;font-weight:500}
 .badge-gray{background:var(--bg);color:var(--muted);border:1px solid var(--border)}
 .badge-gold{background:var(--gold);color:#5a3e00}
 .badge-red{background:#fed7d7;color:#9b2c2c}
-.badge-green{background:#c6f6d5;color:#276749}
-
-/* PHASE TABS */
 .phase-tabs{display:flex;gap:6px;overflow-x:auto;margin-bottom:1.25rem;padding-bottom:2px;scrollbar-width:thin}
 .phase-tab{flex-shrink:0;padding:7px 16px;border-radius:999px;border:1px solid var(--border);background:var(--card);font-size:13px;cursor:pointer;color:var(--muted);transition:all .15s;font-family:inherit;font-weight:500}
-.phase-tab:hover{border-color:var(--green);color:var(--green)}
 .phase-tab.active{background:var(--green);color:var(--gold);border-color:var(--green);font-weight:600}
 .phase-tab.locked{opacity:.6}
-
-/* PLAYERS */
 .players-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
 .player-card{padding:1.1rem 1rem;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border);cursor:pointer;text-align:center;transition:all .15s}
 .player-card:hover{border-color:var(--green);background:var(--card);transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.08)}
 .player-avatar{width:52px;height:52px;border-radius:50%;margin:0 auto 10px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#f0b429}
 .player-card-name{font-size:14px;font-weight:600;color:var(--text)}
 .player-card-pts{font-size:12px;color:var(--muted);margin-top:3px}
-.player-add-card{border-style:dashed;background:transparent;cursor:pointer}
+.player-add-card{border-style:dashed;background:transparent}
 .player-add-card:hover{border-color:var(--green)}
 .player-add-card .player-avatar{background:var(--border)}
-
-/* MATCH ROW */
 .match{display:grid;grid-template-columns:1fr 100px 1fr;align-items:center;gap:8px;padding:11px 0;border-bottom:1px solid var(--border)}
 .match:last-child{border-bottom:none}
 .team{display:flex;align-items:center;gap:8px}
@@ -77,27 +63,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 .actual-score{font-size:11px;color:var(--muted);font-weight:500}
 .group-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);padding:10px 0 6px;border-bottom:1px solid var(--border);margin-bottom:4px}
 .group-label:not(:first-child){margin-top:8px}
-
-/* LEADERBOARD */
 .lb-header{display:grid;grid-template-columns:36px 1fr 50px 50px 50px;gap:8px;padding:4px 14px;font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px}
 .lb-row{display:grid;grid-template-columns:36px 1fr 50px 50px 50px;align-items:center;gap:8px;padding:11px 14px;border-radius:var(--radius-sm);font-size:14px;margin-bottom:4px}
 .lb-row.pos1{background:#f0b429;color:#3a2600}
 .lb-row.pos2{background:#e8edf2;color:#2d3748}
 .lb-row.pos3{background:#fbd38d;color:#7b341e}
 .lb-row.other{background:var(--bg)}
-.lb-pos{font-weight:700;font-size:14px;text-align:center}
+.lb-pos{font-weight:700;text-align:center}
 .lb-name{font-weight:600;display:flex;align-items:center;gap:8px}
 .lb-mini-avatar{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#f0b429;flex-shrink:0}
 .lb-pts{text-align:center;font-weight:700;font-size:16px}
 .lb-detail{text-align:center;font-size:13px}
-
-/* SCORING INFO */
 .scoring-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1rem}
 .scoring-card{padding:12px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border);text-align:center}
 .scoring-card .val{font-size:22px;font-weight:700;color:var(--green)}
 .scoring-card .lbl{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.4}
-
-/* ADMIN */
 .admin-match{display:grid;grid-template-columns:1fr 50px 50px 1fr;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px}
 .admin-match:last-child{border-bottom:none}
 .admin-input{width:48px;height:32px;text-align:center;border:1px solid var(--border);border-radius:6px;font-size:15px;font-weight:600;background:var(--bg);color:var(--text);-moz-appearance:textfield}
@@ -107,39 +87,34 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 .admin-team.right{text-align:right}
 .knockout-edit{display:flex;flex-direction:column;gap:8px;padding:10px 0;border-bottom:1px solid var(--border)}
 .knockout-edit:last-child{border-bottom:none}
-.knockout-edit label{font-size:12px;color:var(--muted);font-weight:500}
 .knockout-row{display:grid;grid-template-columns:1fr 42px 42px 1fr;align-items:center;gap:8px}
-
-/* FORMS / BUTTONS */
 .btn{padding:9px 20px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--card);color:var(--text);font-size:14px;cursor:pointer;font-family:inherit;font-weight:500;transition:all .15s}
 .btn:hover{border-color:var(--green);background:var(--bg)}
 .btn.primary{background:var(--green);color:var(--gold);border-color:var(--green)}
 .btn.primary:hover{background:var(--green-light)}
 .btn.danger{background:#fed7d7;color:#9b2c2c;border-color:#fca5a5}
-.btn.danger:hover{background:#fecaca}
 .btn.sm{padding:5px 12px;font-size:12px}
 .btn-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:1rem}
 .input{width:100%;padding:9px 13px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);color:var(--text);font-size:14px;font-family:inherit;transition:border .15s}
 .input:focus{outline:none;border-color:var(--green);box-shadow:0 0 0 3px rgba(26,71,42,.12)}
 .label{font-size:13px;color:var(--muted);margin-bottom:5px;display:block;font-weight:500}
-
-/* BACK ROW */
 .back-row{display:flex;align-items:center;gap:8px;margin-bottom:1rem;cursor:pointer;color:var(--muted);font-size:14px;font-weight:500;width:fit-content;padding:6px 10px;border-radius:var(--radius-sm);transition:all .15s}
 .back-row:hover{color:var(--text);background:var(--border)}
-
-/* OVERLAY MODAL */
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:200;padding:1rem}
 .modal{background:var(--card);border-radius:var(--radius);padding:1.5rem;width:100%;max-width:380px;border:1px solid var(--border);box-shadow:0 20px 60px rgba(0,0,0,.3)}
-.modal h2{font-size:18px;font-weight:700;margin-bottom:1rem;color:var(--text)}
-
-/* MISC */
+.modal h2{font-size:18px;font-weight:700;margin-bottom:1rem}
 .empty{text-align:center;padding:2rem 1rem;color:var(--muted);font-size:14px}
 .tip{font-size:12px;color:var(--muted);margin-top:.5rem;line-height:1.5}
 .player-header{display:flex;align-items:center;gap:14px;margin-bottom:1.25rem;padding-bottom:1rem;border-bottom:1px solid var(--border)}
-.player-header-name{font-size:20px;font-weight:700;color:var(--text)}
+.player-header-name{font-size:20px;font-weight:700}
 .player-header-sub{font-size:13px;color:var(--muted);margin-top:2px}
 .phase-locked-msg{padding:10px 14px;background:#fef3c7;border:1px solid #f6d860;border-radius:var(--radius-sm);font-size:13px;color:#92400e;margin-bottom:1rem}
-
+/* SYNC STATUS */
+.sync-bar{position:fixed;bottom:1rem;right:1rem;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 14px;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;box-shadow:0 4px 16px rgba(0,0,0,.12);transition:all .3s;z-index:100}
+.sync-bar.saving{color:#92400e;border-color:#f6d860;background:#fef3c7}
+.sync-bar.error{color:#9b2c2c;border-color:#fca5a5;background:#fed7d7}
+.sync-bar.ok{color:#276749;border-color:#9ae6b4;background:#c6f6d5}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:currentColor;flex-shrink:0}
 @media(max-width:600px){
   .match{grid-template-columns:1fr 90px 1fr}
   .team-name{font-size:12px}
@@ -151,9 +126,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 </head>
 <body>
 <div class="app" id="root"></div>
+<div class="sync-bar" id="sync-bar"><span class="sync-dot"></span><span id="sync-msg">Conectado</span></div>
+
 <script>
 // ============================================================
-//  DATA
+//  CONFIG — JSONBin
+// ============================================================
+const BIN_ID   = '6a275cc9da38895dfe9d04c2';
+const MASTER_KEY = '$2a$10$BFCDKms/rPAn3zcFFbTxoe31tARA4uHY6iU2i6tcqIQwCmxRFzOpe';
+const API_BASE = 'https://api.jsonbin.io/v3/b/' + BIN_ID;
+
+// ============================================================
+//  DATA — grupos del mundial
 // ============================================================
 const GROUPS={
   'Grupo A':['Qatar 🇶🇦','Ecuador 🇪🇨','Senegal 🇸🇳','Países Bajos 🇳🇱'],
@@ -165,7 +149,6 @@ const GROUPS={
   'Grupo G':['Brasil 🇧🇷','Serbia 🇷🇸','Suiza 🇨🇭','Camerún 🇨🇲'],
   'Grupo H':['Portugal 🇵🇹','Ghana 🇬🇭','Uruguay 🇺🇾','Corea del Sur 🇰🇷'],
 };
-
 function makeGroupMatches(){
   const m=[];let id=1;
   for(const[g,teams]of Object.entries(GROUPS)){
@@ -188,21 +171,69 @@ const DEFAULT_PHASES=[
 ];
 
 // ============================================================
-//  STATE
+//  STATE & SYNC
 // ============================================================
-function loadState(){
-  try{const s=localStorage.getItem('prode_mundial_v4');if(s)return JSON.parse(s);}catch(e){}
-  return null;
+let state = {phases: JSON.parse(JSON.stringify(DEFAULT_PHASES)), players: [], adminPin: '1234'};
+let saveTimer = null;
+let lastEtag = null;
+let pollTimer = null;
+
+function syncStatus(type, msg){
+  const bar = document.getElementById('sync-bar');
+  const txt = document.getElementById('sync-msg');
+  if(!bar) return;
+  bar.className = 'sync-bar ' + type;
+  txt.textContent = msg;
+  if(type === 'ok') setTimeout(()=>{ bar.className='sync-bar'; txt.textContent='Conectado'; }, 2000);
 }
-function saveState(){
-  try{localStorage.setItem('prode_mundial_v4',JSON.stringify(state));}catch(e){}
+
+async function loadFromCloud(){
+  try{
+    const resp = await fetch(API_BASE + '/latest', {
+      headers:{'X-Master-Key': MASTER_KEY}
+    });
+    const data = await resp.json();
+    if(data.record){
+      const rec = data.record;
+      // Merge: preserve phase structure, update with cloud data
+      if(rec.players) state.players = rec.players;
+      if(rec.adminPin) state.adminPin = rec.adminPin;
+      if(rec.phases && rec.phases.length > 0) state.phases = rec.phases;
+      lastEtag = resp.headers.get('ETag');
+      return true;
+    }
+  }catch(e){ syncStatus('error','Sin conexión'); }
+  return false;
 }
-function initState(){
-  const saved=loadState();
-  if(saved&&saved.phases)return saved;
-  return{phases:JSON.parse(JSON.stringify(DEFAULT_PHASES)),players:[],adminPin:'1234'};
+
+async function saveToCloud(){
+  syncStatus('saving','Guardando...');
+  try{
+    const resp = await fetch(API_BASE, {
+      method:'PUT',
+      headers:{
+        'Content-Type':'application/json',
+        'X-Master-Key': MASTER_KEY
+      },
+      body: JSON.stringify(state)
+    });
+    if(resp.ok){ syncStatus('ok','Guardado ✓'); }
+    else{ syncStatus('error','Error al guardar'); }
+  }catch(e){ syncStatus('error','Sin conexión'); }
 }
-let state=initState();
+
+function scheduleSave(){
+  if(saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveToCloud, 800);
+}
+
+// Poll for changes every 10s
+function startPolling(){
+  pollTimer = setInterval(async ()=>{
+    const updated = await loadFromCloud();
+    if(updated) render();
+  }, 10000);
+}
 
 // ============================================================
 //  HELPERS
@@ -236,18 +267,19 @@ function avatarColor(name){let h=0;for(const c of name)h+=c.charCodeAt(0);return
 function initials(name){return name.trim().split(/\s+/).map(w=>w[0]).join('').toUpperCase().slice(0,2);}
 function flag(team){const m=team.match(/(\p{Emoji_Presentation}|\p{Extended_Pictographic})/u);return m?m[0]:'🏳️';}
 function cleanName(team){return team.replace(/\s*(\p{Emoji_Presentation}|\p{Extended_Pictographic})+\s*/gu,' ').trim();}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 // ============================================================
 //  VIEW STATE
 // ============================================================
-let view='home'; // home | player | admin | leaderboard
+let view='home';
 let currentPlayer=null;
 let currentPhase='grupos';
 let adminAuthed=false;
-let modalOpen=null; // 'addPlayer' | null
+let modalOpen=null;
 
 // ============================================================
-//  RENDER ENTRY
+//  RENDER
 // ============================================================
 function render(){
   const root=document.getElementById('root');
@@ -261,9 +293,6 @@ function render(){
   bindEvents();
 }
 
-// ============================================================
-//  HEADER + NAV
-// ============================================================
 function renderHeader(sub=''){
   return`<div class="header">
     <div class="header-badge">⚽ Prode del Mundial</div>
@@ -279,9 +308,6 @@ function renderNav(){
   </nav>`;
 }
 
-// ============================================================
-//  HOME — player selector
-// ============================================================
 function renderHome(){
   const lb=getLeaderboard();
   const ptsMap=Object.fromEntries(lb.map(p=>[p.id,p.pts]));
@@ -301,24 +327,19 @@ function renderHome(){
       </div>
     </div>
   </div>
-  <p class="tip">Tocá tu nombre para ver y editar tus pronósticos. El administrador carga los resultados reales.</p>`;
+  <p class="tip">Tocá tu nombre para ver y editar tus pronósticos. Los cambios se sincronizan en todos los dispositivos.</p>`;
 }
 
-// ============================================================
-//  PLAYER — predictions per phase
-// ============================================================
 function renderPlayer(){
   const player=state.players.find(p=>p.id===currentPlayer);
   if(!player){view='home';return renderHome();}
   const ph=getPhase(currentPhase);
   const allResults=getAllResults();
   const preds=player.predictions||{};
-
   const tabs=state.phases.map(p=>`
     <button class="phase-tab${p.id===currentPhase?' active':''}${p.locked?' locked':''}" data-phase="${p.id}">
       ${p.locked?'🔒 ':''}${p.label}
     </button>`).join('');
-
   let matchesHtml='';
   if(ph.hasGroups){
     const byGroup={};
@@ -330,11 +351,10 @@ function renderPlayer(){
   }else{
     matchesHtml=ph.matches.map(m=>renderMatchRow(m,preds,ph.locked,allResults)).join('');
   }
-
   return`<div class="back-row" data-action="goHome">← Volver</div>
   <div class="player-header">
     <div class="player-avatar" style="background:${avatarColor(player.name)};width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#f0b429;flex-shrink:0">${initials(player.name)}</div>
-    <div><div class="player-header-name">${esc(player.name)}</div><div class="player-header-sub">Cargá tu pronóstico — resultado exacto vale 3 pts, ganador/empate correcto vale 1 pt</div></div>
+    <div><div class="player-header-name">${esc(player.name)}</div><div class="player-header-sub">Exacto = 3 pts · Ganador/empate = 1 pt</div></div>
   </div>
   <div class="phase-tabs">${tabs}</div>
   ${ph.locked?`<div class="phase-locked-msg">🔒 Esta fase está cerrada. Ya no se pueden modificar los pronósticos.</div>`:''}
@@ -350,9 +370,7 @@ function renderMatchRow(m,preds,locked,allResults){
   const hv=pred.home!==null?pred.home:'';
   const av=pred.away!==null?pred.away:'';
   const dis=locked?'disabled':'';
-
-  let pill='';
-  let actualStr='';
+  let pill='', actualStr='';
   if(actual&&actual.home!==null&&actual.away!==null){
     actualStr=`<div class="actual-score">Real: ${actual.home}–${actual.away}</div>`;
     if(pred.home!==null&&pred.away!==null){
@@ -361,7 +379,6 @@ function renderMatchRow(m,preds,locked,allResults){
       else pill='<span class="result-pill miss">0 pts</span>';
     }
   }
-
   return`<div class="match">
     <div class="team"><span class="team-flag">${flag(m.home)}</span><span class="team-name">${cleanName(m.home)}</span></div>
     <div class="score-box">
@@ -370,16 +387,12 @@ function renderMatchRow(m,preds,locked,allResults){
         <span class="score-sep">:</span>
         <input class="score-input" type="number" min="0" max="20" value="${av}" placeholder="–" data-pred="${m.id}" data-side="away" ${dis}>
       </div>
-      ${actualStr}
-      ${pill}
+      ${actualStr}${pill}
     </div>
     <div class="team right"><span class="team-flag">${flag(m.away)}</span><span class="team-name">${cleanName(m.away)}</span></div>
   </div>`;
 }
 
-// ============================================================
-//  LEADERBOARD
-// ============================================================
 function renderLeaderboard(){
   const lb=getLeaderboard();
   const medals=['🥇','🥈','🥉'];
@@ -409,16 +422,11 @@ function renderLeaderboard(){
   </div>`;
 }
 
-// ============================================================
-//  ADMIN
-// ============================================================
 function renderAdmin(){
   if(!adminAuthed) return renderAdminLogin();
   const ph=getPhase(currentPhase);
-
   const tabs=state.phases.map(p=>`
     <button class="phase-tab${p.id===currentPhase?' active':''}" data-phase="${p.id}">${p.label}</button>`).join('');
-
   let matchRows='';
   if(ph.hasGroups){
     const byGroup={};
@@ -430,7 +438,6 @@ function renderAdmin(){
   }else{
     matchRows=ph.matches.map(renderKOAdminRow).join('');
   }
-
   return renderHeader('Panel de administración')+renderNav()+
   `<div class="section">
     <div class="section-title">Fases</div>
@@ -439,7 +446,7 @@ function renderAdmin(){
       <button class="btn${!ph.locked?' primary':''} sm" data-action="unlockPhase">✅ Abrir fase</button>
       <button class="btn${ph.locked?' primary':''} sm" data-action="lockPhase">🔒 Cerrar fase</button>
     </div>
-    <p class="tip" style="margin-top:.75rem">Una fase cerrada no permite modificar pronósticos. Cerrá cada fase justo antes del primer partido.</p>
+    <p class="tip" style="margin-top:.75rem">Cerrá cada fase justo antes del primer partido para que nadie pueda editar sus pronósticos.</p>
   </div>
   <div class="section">
     <div class="section-title">Resultados reales — ${ph.label}</div>
@@ -450,7 +457,7 @@ function renderAdmin(){
     </div>
   </div>
   <div class="section">
-    <div class="section-title">Jugadores registrados</div>
+    <div class="section-title">Jugadores</div>
     ${state.players.map(p=>`
       <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border)">
         <span style="font-size:14px;font-weight:500">${esc(p.name)}</span>
@@ -462,17 +469,16 @@ function renderAdmin(){
     <div class="section-title">Configuración</div>
     <label class="label">PIN de administrador</label>
     <div style="display:flex;gap:8px">
-      <input class="input" id="pin-change" type="text" maxlength="8" value="${esc(state.adminPin)}" placeholder="PIN" style="max-width:160px">
+      <input class="input" id="pin-change" type="text" maxlength="8" value="${esc(state.adminPin)}" style="max-width:160px">
       <button class="btn primary" data-action="savePin">Guardar PIN</button>
     </div>
-    <p class="tip">El PIN por defecto es 1234. Cambialo antes de compartir el link.</p>
   </div>`;
 }
 
 function renderAdminMatchRow(m){
   const r=m.result||{};
-  const hv=r.home!==null&&r.home!==undefined?r.home:'';
-  const av=r.away!==null&&r.away!==undefined?r.away:'';
+  const hv=r.home!=null?r.home:'';
+  const av=r.away!=null?r.away:'';
   return`<div class="admin-match">
     <span class="admin-team">${flag(m.home)} ${cleanName(m.home)}</span>
     <input class="admin-input" type="number" min="0" max="20" value="${hv}" placeholder="–" data-amid="${m.id}" data-side="home">
@@ -480,11 +486,10 @@ function renderAdminMatchRow(m){
     <span class="admin-team right">${cleanName(m.away)} ${flag(m.away)}</span>
   </div>`;
 }
-
 function renderKOAdminRow(m){
   const r=m.result||{};
-  const hv=r.home!==null&&r.home!==undefined?r.home:'';
-  const av=r.away!==null&&r.away!==undefined?r.away:'';
+  const hv=r.home!=null?r.home:'';
+  const av=r.away!=null?r.away:'';
   return`<div class="knockout-edit">
     <div class="knockout-row">
       <input class="input" type="text" placeholder="Equipo local" value="${esc(m.home==='Por definir'?'':m.home)}" data-amid="${m.id}" data-side="homeName" style="font-size:13px;padding:7px 10px">
@@ -494,21 +499,16 @@ function renderKOAdminRow(m){
     </div>
   </div>`;
 }
-
 function renderAdminLogin(){
   return renderHeader('Administración')+renderNav()+
   `<div class="section" style="max-width:340px;margin:0 auto">
     <div class="section-title">Ingresar como administrador</div>
-    <label class="label">PIN de administrador</label>
+    <label class="label">PIN</label>
     <input class="input" id="admin-pin-field" type="password" placeholder="****" maxlength="8" style="margin-bottom:1rem">
     <button class="btn primary" style="width:100%" data-action="doAdminLogin">Ingresar</button>
-    <p class="tip" style="margin-top:.75rem">Solo el organizador del prode necesita el PIN. PIN por defecto: 1234</p>
+    <p class="tip" style="margin-top:.75rem">PIN por defecto: 1234</p>
   </div>`;
 }
-
-// ============================================================
-//  MODAL — add player
-// ============================================================
 function renderAddPlayerModal(){
   return`<div class="overlay" id="overlay">
     <div class="modal">
@@ -528,34 +528,28 @@ function renderAddPlayerModal(){
 // ============================================================
 function bindEvents(){
   document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>{
-    view=el.dataset.go;if(view==='admin'&&!adminAuthed)adminAuthed=false;render();
+    view=el.dataset.go;render();
   }));
   document.querySelectorAll('[data-phase]').forEach(el=>el.addEventListener('click',()=>{
     currentPhase=el.dataset.phase;render();
   }));
   document.querySelectorAll('[data-action]').forEach(el=>el.addEventListener('click',handleAction));
-
-  // live prediction save
   document.querySelectorAll('[data-pred]').forEach(input=>{
     input.addEventListener('change',()=>{
       const player=state.players.find(p=>p.id===currentPlayer);
       if(!player)return;
       if(!player.predictions)player.predictions={};
-      const mid=input.dataset.pred, side=input.dataset.side;
+      const mid=input.dataset.pred,side=input.dataset.side;
       const val=input.value===''?null:parseInt(input.value);
       if(!player.predictions[mid])player.predictions[mid]={home:null,away:null};
       player.predictions[mid][side]=val;
-      saveState();
+      scheduleSave();
     });
   });
-
-  // admin pin field enter
   const pf=document.getElementById('admin-pin-field');
   if(pf)pf.addEventListener('keydown',e=>{if(e.key==='Enter')doAdminLogin();});
   const nf=document.getElementById('new-player-name');
   if(nf)nf.addEventListener('keydown',e=>{if(e.key==='Enter')confirmAddPlayer();});
-
-  // overlay click outside
   const ov=document.getElementById('overlay');
   if(ov)ov.addEventListener('click',e=>{if(e.target===ov){modalOpen=null;render();}});
 }
@@ -582,17 +576,17 @@ function confirmAddPlayer(){
   if(!name)return;
   if(state.players.find(p=>p.name.toLowerCase()===name.toLowerCase())){alert('Ya existe un jugador con ese nombre.');return;}
   state.players.push({id:'p'+Date.now(),name,predictions:{}});
-  saveState();modalOpen=null;render();
+  modalOpen=null;render();scheduleSave();
 }
 function doAdminLogin(){
   const f=document.getElementById('admin-pin-field');
   if(f&&f.value===state.adminPin){adminAuthed=true;render();}
-  else{alert('PIN incorrecto. Intentá de nuevo.');}
+  else{alert('PIN incorrecto.');}
 }
 function saveResults(){
   const ph=getPhase(currentPhase);
   document.querySelectorAll('[data-amid]').forEach(input=>{
-    const mid=input.dataset.amid, side=input.dataset.side;
+    const mid=input.dataset.amid,side=input.dataset.side;
     const m=ph.matches.find(x=>x.id===mid);
     if(!m)return;
     if(side==='homeName'){if(input.value.trim())m.home=input.value.trim();}
@@ -603,33 +597,37 @@ function saveResults(){
       m.result[side]=val;
     }
   });
-  saveState();
-  // show brief confirmation without alert
+  scheduleSave();
   const btn=document.querySelector('[data-action="saveResults"]');
   if(btn){const orig=btn.textContent;btn.textContent='✅ Guardado';setTimeout(()=>{btn.textContent=orig;},1500);}
 }
 function setPhaseLock(lock){
-  const ph=getPhase(currentPhase);if(ph){ph.locked=lock;saveState();render();}
+  const ph=getPhase(currentPhase);if(ph){ph.locked=lock;render();scheduleSave();}
 }
 function deletePlayer(pid){
   if(!confirm('¿Eliminar este jugador y todos sus pronósticos?'))return;
   state.players=state.players.filter(p=>p.id!==pid);
-  saveState();render();
+  render();scheduleSave();
 }
 function savePin(){
   const f=document.getElementById('pin-change');
-  if(f&&f.value.trim()){state.adminPin=f.value.trim();saveState();alert('PIN actualizado.');}
+  if(f&&f.value.trim()){state.adminPin=f.value.trim();scheduleSave();alert('PIN actualizado.');}
 }
 function resetResults(){
-  if(!confirm('¿Limpiar todos los resultados reales de esta fase? Los pronósticos de los jugadores no se borran.'))return;
-  const ph=getPhase(currentPhase);ph.matches.forEach(m=>m.result=null);saveState();render();
+  if(!confirm('¿Limpiar todos los resultados de esta fase?'))return;
+  const ph=getPhase(currentPhase);ph.matches.forEach(m=>m.result=null);render();scheduleSave();
 }
-function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 // ============================================================
 //  INIT
 // ============================================================
-render();
+(async ()=>{
+  syncStatus('saving','Cargando...');
+  await loadFromCloud();
+  render();
+  syncStatus('ok','Conectado');
+  startPolling();
+})();
 </script>
 </body>
 </html>
