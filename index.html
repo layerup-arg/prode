@@ -120,8 +120,8 @@ body{font-family:'Barlow',sans-serif;background:var(--dark);color:var(--light);m
 .actual-score{font-size:10px;color:var(--muted);font-weight:600;font-family:'Barlow Condensed',sans-serif;letter-spacing:.3px}
 
 /* ===== LEADERBOARD ===== */
-.lb-header{display:grid;grid-template-columns:36px 1fr 54px 54px 54px;gap:8px;padding:4px 16px;font-family:'Barlow Condensed',sans-serif;font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
-.lb-row{display:grid;grid-template-columns:36px 1fr 54px 54px 54px;align-items:center;gap:8px;padding:13px 16px;border-radius:var(--radius-sm);font-size:14px;margin-bottom:5px;position:relative;overflow:hidden;transition:transform .15s;border:1px solid transparent}
+.lb-header{display:grid;grid-template-columns:36px 1fr 54px 44px 44px 44px;gap:6px;padding:4px 16px;font-family:'Barlow Condensed',sans-serif;font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.lb-row{display:grid;grid-template-columns:36px 1fr 54px 44px 44px 44px;align-items:center;gap:6px;padding:13px 16px;border-radius:var(--radius-sm);font-size:14px;margin-bottom:5px;position:relative;overflow:hidden;transition:transform .15s;border:1px solid transparent}
 .lb-row::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:2px 0 0 2px}
 .lb-row.pos1{background:rgba(255,209,0,.1);border-color:rgba(255,209,0,.25)}
 .lb-row.pos1::before{background:var(--yellow)}
@@ -268,7 +268,7 @@ body{font-family:'Barlow',sans-serif;background:var(--dark);color:var(--light);m
   .team-name{font-size:13px}
   .team-flag-wrap,.team-flag-fallback{width:28px;height:20px}
   .players-grid{grid-template-columns:repeat(auto-fill,minmax(100px,1fr))}
-  .lb-row,.lb-header{grid-template-columns:28px 1fr 44px 44px 44px}
+  .lb-row,.lb-header{grid-template-columns:28px 1fr 42px 36px 36px 36px}
   .score-input{width:34px;height:34px;font-size:16px}
   .admin-match{grid-template-columns:1fr 46px 46px 1fr}
 }
@@ -632,22 +632,28 @@ function calcMatchPts(pred, actual){
 }
 
 function calcPts(preds,results){
-  let pts=0,exact=0,partial=0;
+  let pts=0, homeGoals=0, awayGoals=0, winner=0;
   for(const[mid,actual]of Object.entries(results)){
     const p=preds[mid];
     const{pts:mp,breakdown}=calcMatchPts(p,actual);
     pts+=mp;
-    if(breakdown==='exact')exact++;
-    else if(mp>0)partial++;
+    if(breakdown==='exact'){
+      // exacto = acertó local + visitante + ganador
+      homeGoals++; awayGoals++; winner++;
+    } else if(Array.isArray(breakdown)){
+      if(breakdown.includes('homeGoals')) homeGoals++;
+      if(breakdown.includes('awayGoals')) awayGoals++;
+      if(breakdown.includes('winner'))    winner++;
+    }
   }
-  return{pts,exact,partial};
+  return{pts, homeGoals, awayGoals, winner};
 }
 function getLeaderboard(){
   const results=getAllResults();
   return state.players.map(p=>{
-    const{pts,exact,partial}=calcPts(p.predictions||{},results);
-    return{...p,pts,exact,partial};
-  }).sort((a,b)=>b.pts-a.pts||(b.exact-a.exact)||(b.partial-a.partial));
+    const{pts,homeGoals,awayGoals,winner}=calcPts(p.predictions||{},results);
+    return{...p,pts,homeGoals,awayGoals,winner};
+  }).sort((a,b)=>b.pts-a.pts||(b.homeGoals+b.awayGoals)-(a.homeGoals+a.awayGoals)||(b.winner-a.winner));
 }
 function initials(name){return name.trim().split(/\s+/).map(w=>w[0]).join('').toUpperCase().slice(0,2);}
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -853,7 +859,14 @@ function renderLeaderboard(){
       <div class="scoring-card"><div class="val">2</div><div class="lbl">Goles de un equipo exactos</div></div>
       <div class="scoring-card"><div class="val">1</div><div class="lbl">Ganador o empate correcto</div></div>
     </div>
-    <div class="lb-header"><span></span><span>Jugador</span><span>Pts</span><span>Exactos</span><span>Parciales</span></div>
+    <div class="lb-header">
+      <span></span>
+      <span>Jugador</span>
+      <span style="text-align:center">Pts</span>
+      <span style="text-align:center">⚽ Local</span>
+      <span style="text-align:center">⚽ Visit.</span>
+      <span style="text-align:center">🏆 Gan.</span>
+    </div>
     ${lb.length===0?`<div class="empty">Todavía no hay jugadores</div>`:
       lb.map((p,i)=>{
         const pal=playerPalette(p.name);
@@ -864,8 +877,9 @@ function renderLeaderboard(){
             ${esc(p.name)}
           </div>
           <div class="lb-pts">${p.pts}</div>
-          <div class="lb-detail">${p.exact}</div>
-          <div class="lb-detail">${p.partial}</div>
+          <div class="lb-detail">${p.homeGoals}</div>
+          <div class="lb-detail">${p.awayGoals}</div>
+          <div class="lb-detail">${p.winner}</div>
         </div>`;
       }).join('')
     }
