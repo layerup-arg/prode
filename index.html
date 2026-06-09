@@ -717,30 +717,20 @@ function syncStatus(type,msg){
 // ============================================================
 function getPhase(id){return state.phases.find(p=>p.id===id);}
 function getAllResults(){const r={};for(const ph of state.phases)for(const m of ph.matches)if(m.result)r[m.id]=m.result;return r;}
+function initials(name){return name.trim().split(/\s+/).map(w=>w[0]).join('').toUpperCase().slice(0,2);}
+
 function calcMatchPts(pred, actual){
   // Returns {pts, breakdown} for a single match
-  // pred and actual are {home: N, away: N}
   if(!actual||actual.home===null||actual.away===null)return{pts:0,breakdown:null};
   if(!pred||pred.home===null||pred.away===null)return{pts:0,breakdown:null};
-
-  // Exact result: 5 pts (includes everything)
   if(pred.home===actual.home && pred.away===actual.away)
     return{pts:5,breakdown:'exact'};
-
-  let pts=0;
-  let reasons=[];
-
-  // 1pt — acertar ganador/perdedor/empate
+  let pts=0, reasons=[];
   const predSign=Math.sign(pred.home-pred.away);
   const actSign=Math.sign(actual.home-actual.away);
   if(predSign===actSign){pts+=1;reasons.push('winner');}
-
-  // 2pts — goles local exactos
   if(pred.home===actual.home){pts+=2;reasons.push('homeGoals');}
-
-  // 2pts — goles visitante exactos
   if(pred.away===actual.away){pts+=2;reasons.push('awayGoals');}
-
   return{pts,breakdown:reasons.length>0?reasons:['miss']};
 }
 
