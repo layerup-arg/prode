@@ -291,9 +291,170 @@ body{font-family:'Barlow',sans-serif;background:var(--dark);color:var(--light);m
 // ============================================================
 //  CONFIG
 // ============================================================
-const BIN_ID    = '6a275cc9da38895dfe9d04c2';
-const MASTER_KEY= '$2a$10$BFCDKms/rPAn3zcFFbTxoe31tARA4uHY6iU2i6tcqIQwCmxRFzOpe';
-const API_BASE  = 'https://api.jsonbin.io/v3/b/' + BIN_ID;
+// ============================================================
+//  SUPABASE CONFIG
+// ============================================================
+const SUPA_URL  = 'https://funnlrfennavtpdprnbo.supabase.co';
+const SUPA_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ1bm5scmZlbm5hdnRwZHBybmJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2OTI2OTUsImV4cCI6MjA5MjI2ODY5NX0.g_8yqdYFR7P9ao9QhYJ5XONA2JCa-fYgh9YBIy3wRZA';
+const SUPA_H    = {'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':`Bearer ${SUPA_KEY}`};
+
+async function supa(path, opts={}){
+  const controller = new AbortController();
+  const t = setTimeout(()=>controller.abort(), 6000);
+  try{
+    const r = await fetch(`${SUPA_URL}/rest/v1/${path}`,{...opts,headers:{...SUPA_H,...(opts.headers||{})},signal:controller.signal});
+    clearTimeout(t);
+    return r;
+  }catch(e){ clearTimeout(t); throw e; }
+}
+
+// ============================================================
+//  STATE & SYNC — Supabase
+// ============================================================
+let state={phases:JSON.parse(JSON.stringify(DEFAULT_PHASES)),players:[],adminPin:'1234'};
+let saveTimer=null;
+
+function syncStatus(type,msg){
+  const bar=document.getElementById('sync-bar');
+  const txt=document.getElementById('sync-msg');
+  if(!bar)return;
+  bar.className='sync-bar '+type;
+  txt.textContent=msg;
+  if(type==='ok')setTimeout(()=>{bar.className='sync-bar';txt.textContent='En línea';},2500);
+}
+
+async function loadFromCloud(){
+  try{
+    // Load players
+    const pResp = await supa('prode_players?select=id,name,pin&order=created_at');
+    if(!pResp.ok) return false;
+    const players = await pResp.json();
+
+    // Load predictions for all players
+    const predResp = await supa('prode_predictions?select=player_id,match_id,home_goals,away_goals');
+    const predictions = predResp.ok ? await predResp.json() : [];
+
+    // Load results
+    const resResp = await supa('prode_results?select=match_id,home_goals,away_goals');
+    const results = resResp.ok ? await resResp.json() : [];
+
+    // Load phase locks
+    const phResp = await supa('prode_phases?select=id,locked');
+    const phaseLocks = phResp.ok ? await phResp.json() : [];
+
+    // Load settings
+    const setResp = await supa('prode_settings?select=key,value');
+    const settings = setResp.ok ? await setResp.json() : [];
+
+    // Build predictions map per player
+    const predMap = {};
+    for(const p of predictions){
+      if(!predMap[p.player_id]) predMap[p.player_id]={};
+      predMap[p.player_id][p.match_id]={home:p.home_goals, away:p.away_goals};
+    }
+
+    // Build results map
+    const resMap = {};
+    for(const r of results) resMap[r.match_id]={home:r.home_goals, away:r.away_goals};
+
+    // Build phase locks map
+    const lockMap = {};
+    for(const p of phaseLocks) lockMap[p.id]=p.locked;
+
+    // Update state.players
+    state.players = players.map(p=>({...p, predictions: predMap[p.id]||{}}));
+
+    // Update state.phases — apply results and locks from DB onto DEFAULT_PHASES structure
+    state.phases = DEFAULT_PHASES.map(ph=>{
+      const locked = lockMap[ph.id] ?? ph.locked;
+      const matches = ph.matches.map(m=>{
+        const result = resMap[m.id] || null;
+        return {...m, result};
+      });
+      return {...ph, locked, matches};
+    });
+
+    // Update adminPin
+    const pinSetting = settings.find(s=>s.key==='adminPin');
+    if(pinSetting) state.adminPin = pinSetting.value;
+
+    return true;
+  }catch(e){
+    console.warn('loadFromCloud error:', e);
+    syncStatus('error', e.name==='AbortError'?'Timeout':'Sin conexión');
+    return false;
+  }
+}
+
+async function savePlayerPrediction(playerId, matchId, homeGoals, awayGoals){
+  // Upsert single prediction row — rápido y no bloquea
+  await supa('prode_predictions', {
+    method:'POST',
+    headers:{'Prefer':'resolution=merge-duplicates,return=minimal'},
+    body:JSON.stringify({player_id:playerId, match_id:matchId, home_goals:homeGoals, away_goals:awayGoals})
+  });
+}
+
+async function saveResults(phaseId){
+  // Called by admin — saves results for all matches in a phase
+  syncStatus('saving','Guardando resultados...');
+  const ph = state.phases.find(p=>p.id===phaseId);
+  if(!ph) return;
+  for(const m of ph.matches){
+    if(m.result?.home!=null){
+      await supa('prode_results',{
+        method:'POST',
+        headers:{'Prefer':'resolution=merge-duplicates,return=minimal'},
+        body:JSON.stringify({match_id:m.id, home_goals:m.result.home, away_goals:m.result.away})
+      });
+    }
+  }
+  syncStatus('ok','Resultados guardados ✓');
+}
+
+async function savePhaseLock(phaseId, locked){
+  await supa('prode_phases',{
+    method:'POST',
+    headers:{'Prefer':'resolution=merge-duplicates,return=minimal'},
+    body:JSON.stringify({id:phaseId, locked})
+  });
+}
+
+async function saveAdminPin(pin){
+  await supa('prode_settings',{
+    method:'POST',
+    headers:{'Prefer':'resolution=merge-duplicates,return=minimal'},
+    body:JSON.stringify({key:'adminPin', value:pin})
+  });
+}
+
+async function saveNewPlayer(player){
+  await supa('prode_players',{
+    method:'POST',
+    headers:{'Prefer':'resolution=merge-duplicates,return=minimal'},
+    body:JSON.stringify({id:player.id, name:player.name, pin:player.pin})
+  });
+}
+
+async function deletePlayerFromCloud(pid){
+  // CASCADE deletes predictions too
+  await supa(`prode_players?id=eq.${pid}`,{method:'DELETE'});
+}
+
+async function updatePlayerPin(pid, pin){
+  await supa(`prode_players?id=eq.${pid}`,{
+    method:'PATCH',
+    headers:{'Prefer':'return=minimal'},
+    body:JSON.stringify({pin})
+  });
+}
+
+function scheduleSave(){} // no-op: saves are now immediate per-action
+
+function startPolling(){
+  // Sync entre dispositivos cada 15s
+  setInterval(async()=>{const u=await loadFromCloud();if(u)render();},15000);
+}
 
 // ============================================================
 //  FOOTBALL-DATA.ORG — auto resultados
@@ -549,86 +710,6 @@ function syncStatus(type,msg){
   bar.className='sync-bar '+type;
   txt.textContent=msg;
   if(type==='ok')setTimeout(()=>{bar.className='sync-bar';txt.textContent='En línea';},2500);
-}
-const CURRENT_PHASE_IDS = ['grupos','last32','last16','cuartos','semis','final'];
-const SCHEMA_VERSION = 3; // increment when DEFAULT_PHASES structure changes
-
-function isValidPhaseStructure(phases){
-  if(!phases || phases.length === 0) return false;
-  const ids = phases.map(p=>p.id);
-  return CURRENT_PHASE_IDS.every(id => ids.includes(id));
-}
-
-function mergePhases(cloudPhases){
-  // Keeps results and lock state from cloud, rebuilds structure from DEFAULT_PHASES
-  return DEFAULT_PHASES.map(defaultPh => {
-    const cloudPh = cloudPhases.find(p => p.id === defaultPh.id);
-    if(!cloudPh) return defaultPh; // nueva fase, usar default
-    // Merge partido por partido: conservar result de la nube
-    const mergedMatches = defaultPh.matches.map(defaultM => {
-      const cloudM = cloudPh.matches?.find(m => m.id === defaultM.id);
-      return cloudM ? {...defaultM, result: cloudM.result, home: cloudM.home || defaultM.home, away: cloudM.away || defaultM.away} : defaultM;
-    });
-    return {...defaultPh, locked: cloudPh.locked ?? defaultPh.locked, matches: mergedMatches};
-  });
-}
-
-function fetchWithTimeout(url, options={}, ms=5000){
-  const controller = new AbortController();
-  const timer = setTimeout(()=>controller.abort(), ms);
-  return fetch(url, {...options, signal:controller.signal})
-    .finally(()=>clearTimeout(timer));
-}
-
-async function loadFromCloud(){
-  try{
-    const url = `${API_BASE}/latest?t=${Date.now()}`;
-    const resp = await fetchWithTimeout(url, {
-      headers:{'X-Master-Key':MASTER_KEY},
-      cache:'no-store'
-    }, 5000);
-    if(!resp.ok){ console.warn('JSONBin error:', resp.status); return false; }
-    const data = await resp.json();
-    if(data.record){
-      const rec = data.record;
-      if(rec.players) state.players = rec.players;
-      if(rec.adminPin) state.adminPin = rec.adminPin;
-      if(rec.phases && rec.phases.length > 0){
-        if(isValidPhaseStructure(rec.phases)){
-          state.phases = rec.phases;
-        } else {
-          console.log('⚠️ Migrando fases...');
-          state.phases = mergePhases(rec.phases);
-          saveToCloud();
-        }
-      }
-      return true;
-    }
-  }catch(e){
-    if(e.name==='AbortError') syncStatus('error','Timeout — reintentando...');
-    else syncStatus('error','Sin conexión');
-  }
-  return false;
-}
-async function saveToCloud(){
-  syncStatus('saving','Guardando...');
-  try{
-    const resp = await fetchWithTimeout(API_BASE, {
-      method:'PUT',
-      headers:{'Content-Type':'application/json','X-Master-Key':MASTER_KEY},
-      body:JSON.stringify(state)
-    }, 8000);
-    if(resp.ok) syncStatus('ok','Guardado ✓');
-    else syncStatus('error','Error al guardar');
-  }catch(e){
-    if(e.name==='AbortError') syncStatus('error','Timeout al guardar');
-    else syncStatus('error','Sin conexión');
-  }
-}
-function scheduleSave(){if(saveTimer)clearTimeout(saveTimer);saveTimer=setTimeout(saveToCloud,900);}
-function startPolling(){
-  // Sync entre dispositivos cada 15s — solo lee, no llama a APIs externas
-  setInterval(async()=>{const u=await loadFromCloud();if(u)render();},15000);
 }
 
 // ============================================================
@@ -1161,15 +1242,18 @@ function bindEvents(){
   document.querySelectorAll('[data-phase]').forEach(el=>el.addEventListener('click',()=>{currentPhase=el.dataset.phase;render();}));
   document.querySelectorAll('[data-action]').forEach(el=>el.addEventListener('click',handleAction));
   document.querySelectorAll('[data-pred]').forEach(input=>{
-    input.addEventListener('change',()=>{
-      const player=state.players.find(p=>p.id===currentPlayer);
-      if(!player)return;
-      if(!player.predictions)player.predictions={};
-      const mid=input.dataset.pred,side=input.dataset.side;
+    input.addEventListener('change',async ()=>{
+      const mid=input.dataset.pred, side=input.dataset.side;
       const val=input.value===''?null:parseInt(input.value);
-      if(!player.predictions[mid])player.predictions[mid]={home:null,away:null};
+      const player=state.players.find(p=>p.id===currentPlayer);
+      if(!player) return;
+      if(!player.predictions) player.predictions={};
+      if(!player.predictions[mid]) player.predictions[mid]={home:null,away:null};
       player.predictions[mid][side]=val;
-      scheduleSave();
+      const pred=player.predictions[mid];
+      if(pred.home!==null && pred.away!==null){
+        await savePlayerPrediction(currentPlayer, mid, pred.home, pred.away);
+      }
     });
   });
   const pf=document.getElementById('admin-pin-field');
@@ -1230,7 +1314,7 @@ function handleAction(){
   else if(a==='confirmAddPlayer'){confirmAddPlayer();}
   else if(a==='goHome'){view='home';currentPlayer=null;render();}
   else if(a==='doAdminLogin'){doAdminLogin();}
-  else if(a==='saveResults'){saveResults();}
+  else if(a==='saveResults'){adminSaveResults();}
   else if(a==='forceSyncResults'){forceSyncResults();}
   else if(a==='lockPhase'){setPhaseLock(true);}
   else if(a==='unlockPhase'){setPhaseLock(false);}
@@ -1273,21 +1357,25 @@ function confirmPlayerPin(){
   }
 }
 
-function confirmAddPlayer(){
+async function confirmAddPlayer(){
   const inp=document.getElementById('new-player-name');
   const name=(inp?inp.value:'').trim();
   if(!name){ alert('Ingresá un nombre.'); return; }
   if(state.players.find(p=>p.name.toLowerCase()===name.toLowerCase())){ alert('Ya existe un jugador con ese nombre.'); return; }
   const pin=getPinValue('a');
   if(pin.length<4){ alert('Asigná un PIN de 4 dígitos.'); return; }
-  state.players.push({id:'p'+Date.now(), name, pin, predictions:{}});
-  modalOpen=null; render(); scheduleSave();
+  const player={id:'p'+Date.now(), name, pin, predictions:{}};
+  state.players.push(player);
+  modalOpen=null; render();
+  await saveNewPlayer(player);
 }
+
 function doAdminLogin(){
   const f=document.getElementById('admin-pin-field');
   if(f&&f.value===state.adminPin){adminAuthed=true;render();}
   else alert('PIN incorrecto.');
 }
+
 async function forceSyncResults(){
   const btn = document.querySelector('[data-action="forceSyncResults"]');
   const info = document.getElementById('last-sync-info');
@@ -1297,34 +1385,29 @@ async function forceSyncResults(){
   const apiMatches = await fetchWCMatches();
   if(!apiMatches){
     if(btn){ btn.disabled=false; btn.textContent='⚡ Actualizar resultados ahora'; }
-    if(info) info.textContent='❌ No se pudo conectar con la API. Intentá de nuevo.';
+    if(info) info.textContent='❌ No se pudo conectar con la API.';
     syncStatus('error','Error al consultar API');
     return;
   }
 
-  const byFdId = {};
-  for(const am of apiMatches) byFdId[am.id] = am;
-  const finished = apiMatches.filter(m=>m.status==='FINISHED');
+  const byFdId={};
+  for(const am of apiMatches) byFdId[am.id]=am;
+  const finished=apiMatches.filter(m=>m.status==='FINISHED');
   let changed=0;
 
   for(const ph of state.phases){
     for(const m of ph.matches){
       if(m.result) continue;
-      let apiM = null;
+      let apiM=null;
       if(m.fdId){
-        apiM = byFdId[m.fdId];
-        // Actualizar nombre de equipo si la API ya lo sabe
-        if(apiM && apiM.homeTeam?.name && apiM.awayTeam?.name){
-          const toSpanish = name => {
-            const e = Object.entries(TEAM_NAME_MAP).find(([es,en])=>en===name||normalizeName(en)===normalizeName(name));
-            return e ? e[0] : name;
-          };
-          const nh = toSpanish(apiM.homeTeam.name);
-          const na = toSpanish(apiM.awayTeam.name);
-          if(nh!==m.home||na!==m.away){ m.home=nh; m.away=na; changed++; }
+        apiM=byFdId[m.fdId];
+        if(apiM?.homeTeam?.name && apiM?.awayTeam?.name){
+          const toSpanish=name=>{const e=Object.entries(TEAM_NAME_MAP).find(([es,en])=>en===name||normalizeName(en)===normalizeName(name));return e?e[0]:name;};
+          const nh=toSpanish(apiM.homeTeam.name), na=toSpanish(apiM.awayTeam.name);
+          if(nh!==m.home||na!==m.away){m.home=nh;m.away=na;}
         }
       } else {
-        apiM = finished.find(am=>teamsMatch(am.homeTeam?.name,m.home)&&teamsMatch(am.awayTeam?.name,m.away));
+        apiM=finished.find(am=>teamsMatch(am.homeTeam?.name,m.home)&&teamsMatch(am.awayTeam?.name,m.away));
       }
       if(apiM?.status==='FINISHED'&&apiM.score?.fullTime){
         const h=apiM.score.fullTime.home, a=apiM.score.fullTime.away;
@@ -1334,15 +1417,18 @@ async function forceSyncResults(){
   }
 
   const now=new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
-  if(info) info.textContent = changed>0
-    ? `✅ ${changed} cambio${changed>1?'s':''} a las ${now} · ${finished.length} partidos finalizados en API`
-    : `✅ Sin cambios a las ${now} · ${finished.length} partidos finalizados en API`;
+  if(info) info.textContent=changed>0
+    ? `✅ ${changed} resultado${changed>1?'s':''} a las ${now} · ${finished.length} finalizados en API`
+    : `✅ Sin cambios a las ${now} · ${finished.length} finalizados en API`;
   if(btn){ btn.disabled=false; btn.textContent='⚡ Actualizar resultados ahora'; }
-  if(changed>0){ await saveToCloud(); render(); syncStatus('ok','Actualizado ✓'); }
-  else syncStatus('ok','Sin cambios nuevos');
+  if(changed>0){
+    // Save results per phase
+    for(const ph of state.phases) await saveResults(ph.id);
+    render(); syncStatus('ok','Actualizado ✓');
+  } else syncStatus('ok','Sin cambios nuevos');
 }
 
-function saveResults(){
+async function adminSaveResults(){
   const ph=getPhase(currentPhase);
   document.querySelectorAll('[data-amid]').forEach(input=>{
     const mid=input.dataset.amid,side=input.dataset.side;
@@ -1352,34 +1438,61 @@ function saveResults(){
     else if(side==='awayName'){if(input.value.trim())m.away=input.value.trim();}
     else{const val=input.value===''?null:parseInt(input.value);if(!m.result)m.result={home:null,away:null};m.result[side]=val;}
   });
-  scheduleSave();
+  await saveResults(currentPhase);
+  render();
   const btn=document.querySelector('[data-action="saveResults"]');
   if(btn){const o=btn.textContent;btn.textContent='✅ Guardado';setTimeout(()=>{btn.textContent=o;},1500);}
 }
-function setPhaseLock(lock){const ph=getPhase(currentPhase);if(ph){ph.locked=lock;render();scheduleSave();}}
-function changePlayerPin(pid){
+
+async function setPhaseLock(lock){
+  const ph=getPhase(currentPhase);
+  if(ph){ ph.locked=lock; render(); await savePhaseLock(currentPhase, lock); }
+}
+
+async function changePlayerPin(pid){
   const player=state.players.find(p=>p.id===pid);
   if(!player) return;
   const newPin=prompt(`Nuevo PIN de 4 dígitos para ${player.name}:`);
   if(newPin===null) return;
   if(!/^\d{4}$/.test(newPin)){ alert('El PIN debe ser exactamente 4 dígitos numéricos.'); return; }
   player.pin=newPin;
-  scheduleSave();
   render();
+  await updatePlayerPin(pid, newPin);
   alert(`✅ PIN de ${player.name} actualizado.`);
 }
 
-function deletePlayer(pid){
+async function deletePlayer(pid){
   if(!confirm('¿Eliminar este jugador?'))return;
-  state.players=state.players.filter(p=>p.id!==pid);render();scheduleSave();
+  state.players=state.players.filter(p=>p.id!==pid);
+  render();
+  await deletePlayerFromCloud(pid);
 }
-function savePin(){
+
+async function savePin(){
   const f=document.getElementById('pin-change');
-  if(f&&f.value.trim()){state.adminPin=f.value.trim();scheduleSave();alert('PIN actualizado.');}
+  if(f&&f.value.trim()){
+    state.adminPin=f.value.trim();
+    await saveAdminPin(state.adminPin);
+    alert('PIN actualizado.');
+  }
 }
-function resetResults(){
+
+async function resetResults(){
   if(!confirm('¿Limpiar resultados de esta fase?'))return;
-  const ph=getPhase(currentPhase);ph.matches.forEach(m=>m.result=null);render();scheduleSave();
+  const ph=getPhase(currentPhase);
+  ph.matches.forEach(m=>m.result=null);
+  render();
+  // Delete from DB
+  await supa(`prode_results?match_id=in.(${ph.matches.map(m=>`"${m.id}"`).join(',')})`,{method:'DELETE'});
+}
+
+// Prediction save — called on input change
+async function savePrediction(playerId, matchId, homeGoals, awayGoals){
+  const player=state.players.find(p=>p.id===playerId);
+  if(!player) return;
+  if(!player.predictions) player.predictions={};
+  player.predictions[matchId]={home:homeGoals, away:awayGoals};
+  await savePlayerPrediction(playerId, matchId, homeGoals, awayGoals);
 }
 
 // ============================================================
