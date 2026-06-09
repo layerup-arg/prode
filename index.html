@@ -1063,10 +1063,10 @@ function renderPlayerPinModal(){
       <h2 style="text-align:center;margin-bottom:.25rem">${esc(player.name)}</h2>
       <p style="font-size:13px;color:var(--muted);margin-bottom:1.25rem;font-weight:500">Ingresá tu PIN de 4 dígitos</p>
       <div class="pin-inputs" id="pin-inputs">
-        <input class="pin-digit" type="password" inputmode="numeric" maxlength="1" pattern="[0-9]" data-idx="0">
-        <input class="pin-digit" type="password" inputmode="numeric" maxlength="1" pattern="[0-9]" data-idx="1">
-        <input class="pin-digit" type="password" inputmode="numeric" maxlength="1" pattern="[0-9]" data-idx="2">
-        <input class="pin-digit" type="password" inputmode="numeric" maxlength="1" pattern="[0-9]" data-idx="3">
+        <input class="pin-digit" type="tel" inputmode="numeric" maxlength="1" pattern="[0-9]" data-idx="0">
+        <input class="pin-digit" type="tel" inputmode="numeric" maxlength="1" pattern="[0-9]" data-idx="1">
+        <input class="pin-digit" type="tel" inputmode="numeric" maxlength="1" pattern="[0-9]" data-idx="2">
+        <input class="pin-digit" type="tel" inputmode="numeric" maxlength="1" pattern="[0-9]" data-idx="3">
       </div>
       ${pinError?`<div class="pin-error">${pinError}</div>`:''}
       <div class="btn-row" style="margin-top:1.25rem;justify-content:center">
@@ -1085,10 +1085,10 @@ function renderAddPlayerModal(){
       <input class="input" id="new-player-name" type="text" placeholder="Ej: Mamá, El Tío, Juan..." maxlength="30" style="margin-bottom:1rem" autofocus>
       <label class="label">PIN de 4 dígitos</label>
       <div class="pin-inputs" id="pin-inputs-admin" style="justify-content:flex-start;margin-bottom:1rem">
-        <input class="pin-digit" type="password" inputmode="numeric" maxlength="1" pattern="[0-9]" data-idx="a0">
-        <input class="pin-digit" type="password" inputmode="numeric" maxlength="1" pattern="[0-9]" data-idx="a1">
-        <input class="pin-digit" type="password" inputmode="numeric" maxlength="1" pattern="[0-9]" data-idx="a2">
-        <input class="pin-digit" type="password" inputmode="numeric" maxlength="1" pattern="[0-9]" data-idx="a3">
+        <input class="pin-digit" type="tel" inputmode="numeric" maxlength="1" pattern="[0-9]" data-idx="a0">
+        <input class="pin-digit" type="tel" inputmode="numeric" maxlength="1" pattern="[0-9]" data-idx="a1">
+        <input class="pin-digit" type="tel" inputmode="numeric" maxlength="1" pattern="[0-9]" data-idx="a2">
+        <input class="pin-digit" type="tel" inputmode="numeric" maxlength="1" pattern="[0-9]" data-idx="a3">
       </div>
       <p class="tip" style="margin-bottom:1rem">El jugador usará este PIN para acceder a sus pronósticos.</p>
       <div class="btn-row" style="margin-top:0">
@@ -1123,34 +1123,34 @@ function bindEvents(){
   const nf=document.getElementById('new-player-name');
   if(nf)nf.addEventListener('keydown',e=>{if(e.key==='Enter')confirmAddPlayer();});
 
-  // PIN digit navigation — player login and admin add-player
-  document.querySelectorAll('.pin-digit').forEach(input=>{
-    input.addEventListener('input',e=>{
-      const v=e.target.value.replace(/\D/g,'');
-      e.target.value=v?v[0]:'';
-      if(v) e.target.classList.add('filled');
-      else e.target.classList.remove('filled');
-      // auto-advance
-      const idx=parseInt(e.target.dataset.idx);
-      if(v){
-        const next=document.querySelector(`.pin-digit[data-idx="${isNaN(idx)?'a'+(parseInt(e.target.dataset.idx.replace('a',''))+1):idx+1}"]`);
-        if(next) next.focus();
-        else if(!isNaN(idx)) confirmPlayerPin(); // auto-submit on last digit
+  // PIN digit navigation — simple, no auto-submit
+  document.querySelectorAll('.pin-digit').forEach((input, i, all) => {
+    input.addEventListener('keydown', e => {
+      if(e.key === 'Backspace') {
+        if(input.value) {
+          input.value = '';
+        } else if(i > 0) {
+          all[i-1].focus();
+          all[i-1].value = '';
+        }
+        e.preventDefault();
+      }
+      if(e.key === 'Enter') {
+        const isAdmin = input.dataset.idx?.startsWith('a');
+        if(!isAdmin) confirmPlayerPin();
+        else confirmAddPlayer();
       }
     });
-    input.addEventListener('keydown',e=>{
-      if(e.key==='Backspace'&&!e.target.value){
-        const idx=e.target.dataset.idx;
-        const prevIdx=isNaN(parseInt(idx))
-          ? 'a'+(parseInt(idx.replace('a',''))-1)
-          : parseInt(idx)-1;
-        const prev=document.querySelector(`.pin-digit[data-idx="${prevIdx}"]`);
-        if(prev){prev.value='';prev.classList.remove('filled');prev.focus();}
+    input.addEventListener('input', e => {
+      // Keep only last digit typed
+      const v = input.value.replace(/\D/g, '');
+      input.value = v ? v.slice(-1) : '';
+      // Advance to next
+      if(input.value && i < all.length - 1) {
+        all[i+1].focus();
       }
-      if(e.key==='Enter') confirmPlayerPin();
     });
-    // Select all on focus for easy overwrite
-    input.addEventListener('focus',()=>input.select());
+    input.addEventListener('focus', () => input.select());
   });
 
   const ov=document.getElementById('overlay');
@@ -1187,29 +1187,33 @@ function handleAction(){
 }
 
 function getPinValue(prefix=''){
-  // Reads 4 pin-digit inputs. prefix='' for player login, prefix='a' for admin add-player
-  return [0,1,2,3].map(i=>{
-    const el=document.querySelector(`.pin-digit[data-idx="${prefix}${i}"]`);
-    return el?el.value:'';
-  }).join('');
+  const selector = prefix === 'a' ? '#pin-inputs-admin .pin-digit' : '#pin-inputs .pin-digit';
+  const digits = document.querySelectorAll(selector);
+  if(!digits.length) return '';
+  return Array.from(digits).map(d=>d.value||'').join('');
 }
 
 function confirmPlayerPin(){
   const player=state.players.find(p=>p.id===currentPlayer);
   if(!player) return;
   const entered=getPinValue('');
-  if(entered.length<4){ pinError='Ingresá los 4 dígitos'; render(); setTimeout(()=>document.querySelector('.pin-digit')?.focus(),30); return; }
+  if(entered.length<4){
+    pinError='Completá los 4 dígitos';
+    render();
+    setTimeout(()=>document.querySelector('#pin-inputs .pin-digit')?.focus(),30);
+    return;
+  }
   if(entered===String(player.pin)){
     modalOpen=null; pinError=''; view='player'; render();
   } else {
     pinError='PIN incorrecto. Intentá de nuevo.';
     render();
-    // shake animation
     setTimeout(()=>{
-      document.querySelectorAll('.pin-digit').forEach(d=>{d.classList.add('shake');d.value='';d.classList.remove('filled');});
+      const digits=document.querySelectorAll('#pin-inputs .pin-digit');
+      digits.forEach(d=>{ d.classList.add('shake'); d.value=''; });
       setTimeout(()=>{
-        document.querySelectorAll('.pin-digit').forEach(d=>d.classList.remove('shake'));
-        document.querySelector('.pin-digit')?.focus();
+        digits.forEach(d=>d.classList.remove('shake'));
+        digits[0]?.focus();
       },400);
     },30);
   }
