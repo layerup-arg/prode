@@ -286,6 +286,119 @@ const MASTER_KEY= '$2a$10$BFCDKms/rPAn3zcFFbTxoe31tARA4uHY6iU2i6tcqIQwCmxRFzOpe'
 const API_BASE  = 'https://api.jsonbin.io/v3/b/' + BIN_ID;
 
 // ============================================================
+//  FOOTBALL-DATA.ORG — auto resultados
+// ============================================================
+const FD_TOKEN    = '5ff3a00a134a4a3bb424e2420b88db91';
+const FD_BASE     = 'https://api.football-data.org/v4';
+const WC_CODE     = 'WC';   // FIFA World Cup
+let   autoSyncTimer = null;
+const AUTO_SYNC_INTERVAL = 2 * 60 * 1000; // cada 2 minutos
+
+// Mapa nombre del equipo en nuestra app → nombre en football-data.org
+const TEAM_NAME_MAP = {
+  'México':'Mexico','Ecuador':'Ecuador','Qatar':'Qatar','Senegal':'Senegal',
+  'Estados Unidos':'USA','Países Bajos':'Netherlands','Panamá':'Panama','Angola':'Angola',
+  'Argentina':'Argentina','Nigeria':'Nigeria','Canadá':'Canada','Marruecos':'Morocco',
+  'España':'Spain','Brasil':'Brazil','Japón':'Japan','Serbia':'Serbia',
+  'Francia':'France','Alemania':'Germany','Uruguay':'Uruguay','Portugal':'Portugal',
+  'Inglaterra':'England','Bélgica':'Belgium','Australia':'Australia','Suiza':'Switzerland',
+  'Colombia':'Colombia','Croacia':'Croatia','Arabia Saudita':'Saudi Arabia','Polonia':'Poland',
+  'Corea del Sur':'South Korea','Ghana':'Ghana','Costa Rica':'Costa Rica','Nueva Zelanda':'New Zealand',
+  'Irán':'Iran','Camerún':'Cameroon','Turquía':'Türkiye','Túnez':'Tunisia',
+  'Rumania':'Romania','Argelia':'Algeria','Perú':'Peru','República Checa':'Czechia',
+  'Venezuela':'Venezuela','Irak':'Iraq','Kenia':'Kenya','Dinamarca':'Denmark',
+};
+
+function normalizeName(name){
+  return (name||'').toLowerCase().replace(/[áàä]/g,'a').replace(/[éèë]/g,'e')
+    .replace(/[íìï]/g,'i').replace(/[óòö]/g,'o').replace(/[úùü]/g,'u')
+    .replace(/ñ/g,'n').replace(/ç/g,'c').replace(/\s+/g,' ').trim();
+}
+
+function teamsMatch(apiName, ourName){
+  const mapped = TEAM_NAME_MAP[ourName] || ourName;
+  const n1 = normalizeName(apiName);
+  const n2 = normalizeName(mapped);
+  return n1===n2 || n1.includes(n2) || n2.includes(n1);
+}
+
+async function fetchWCMatches(){
+  try{
+    const resp = await fetch(`${FD_BASE}/competitions/${WC_CODE}/matches`, {
+      headers:{'X-Auth-Token': FD_TOKEN}
+    });
+    if(!resp.ok){ console.warn('football-data error:', resp.status); return null; }
+    const data = await resp.json();
+    return data.matches || [];
+  }catch(e){ console.warn('football-data fetch error:', e); return null; }
+}
+
+async function autoSyncResults(){
+  // Solo sincroniza si hay partidos sin resultado en la fase de grupos
+  const phase = state.phases.find(p=>p.id==='grupos');
+  if(!phase) return;
+  const pending = phase.matches.filter(m=>!m.result);
+  if(pending.length===0) return; // todos ya tienen resultado
+
+  const apiMatches = await fetchWCMatches();
+  if(!apiMatches) return;
+
+  // Solo partidos FINISHED
+  const finished = apiMatches.filter(m=>m.status==='FINISHED');
+  if(finished.length===0) return;
+
+  let changed = false;
+  for(const m of pending){
+    // Buscar en la API el partido correspondiente por equipos
+    const apiM = finished.find(am=>
+      teamsMatch(am.homeTeam?.name, m.home) &&
+      teamsMatch(am.awayTeam?.name, m.away)
+    );
+    if(apiM && apiM.score?.fullTime){
+      const home = apiM.score.fullTime.home;
+      const away = apiM.score.fullTime.away;
+      if(home!==null && away!==null){
+        m.result = {home, away};
+        changed = true;
+        console.log(`✅ Auto-resultado: ${m.home} ${home}-${away} ${m.away}`);
+      }
+    }
+  }
+
+  // También sincronizar fases eliminatorias
+  for(const ph of state.phases.filter(p=>p.id!=='grupos')){
+    for(const m of ph.matches.filter(x=>!x.result && x.home!=='Por definir')){
+      const apiM = finished.find(am=>
+        teamsMatch(am.homeTeam?.name, m.home) &&
+        teamsMatch(am.awayTeam?.name, m.away)
+      );
+      if(apiM?.score?.fullTime){
+        const home = apiM.score.fullTime.home;
+        const away = apiM.score.fullTime.away;
+        if(home!==null && away!==null){
+          m.result = {home, away};
+          changed = true;
+        }
+      }
+    }
+  }
+
+  if(changed){
+    syncStatus('saving','Actualizando resultados...');
+    await saveToCloud();
+    render();
+    syncStatus('ok','Resultados actualizados ✓');
+  }
+}
+
+function startAutoSync(){
+  // Primera corrida al cargar (con delay de 3s para no chocar con loadFromCloud)
+  setTimeout(autoSyncResults, 3000);
+  // Luego cada 2 minutos
+  autoSyncTimer = setInterval(autoSyncResults, AUTO_SYNC_INTERVAL);
+}
+
+// ============================================================
 //  FLAG MAP — iso2 codes for flagcdn.com
 // ============================================================
 const FLAG_MAP = {
@@ -470,7 +583,12 @@ async function saveToCloud(){
   }catch(e){syncStatus('error','Sin conexión');}
 }
 function scheduleSave(){if(saveTimer)clearTimeout(saveTimer);saveTimer=setTimeout(saveToCloud,900);}
-function startPolling(){setInterval(async()=>{const u=await loadFromCloud();if(u)render();},12000);}
+function startPolling(){
+  // Sync de estado entre dispositivos cada 12s
+  setInterval(async()=>{const u=await loadFromCloud();if(u)render();},12000);
+  // Auto-resultados desde football-data.org cada 2 min
+  startAutoSync();
+}
 
 // ============================================================
 //  HELPERS
@@ -768,6 +886,14 @@ function renderAdmin(){
   }
   return renderHeader('Panel de administración')+renderNav()+
   `<div class="section">
+    <div class="section-title"><span class="accent" style="background:var(--green)"></span>⚽ Resultados automáticos</div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:1rem;line-height:1.6">Los resultados se sincronizan automáticamente desde <strong style="color:#fff">football-data.org</strong> cada 2 minutos. También podés forzarlo manualmente.</p>
+    <div class="btn-row" style="margin-top:0">
+      <button class="btn primary" data-action="forceSyncResults">⚡ Actualizar resultados ahora</button>
+    </div>
+    <div id="last-sync-info" style="margin-top:.75rem;font-size:12px;color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-weight:600;letter-spacing:.3px"></div>
+  </div>
+  <div class="section">
     <div class="section-title"><span class="accent" style="background:var(--blue)"></span>Fases</div>
     <div class="phase-tabs">${tabs}</div>
     <div class="btn-row" style="margin-top:0">
@@ -966,6 +1092,7 @@ function handleAction(){
   else if(a==='goHome'){view='home';render();}
   else if(a==='doAdminLogin'){doAdminLogin();}
   else if(a==='saveResults'){saveResults();}
+  else if(a==='forceSyncResults'){forceSyncResults();}
   else if(a==='lockPhase'){setPhaseLock(true);}
   else if(a==='unlockPhase'){setPhaseLock(false);}
   else if(a==='deletePlayer'){deletePlayer(this.dataset.pid);}
@@ -986,6 +1113,40 @@ function doAdminLogin(){
   if(f&&f.value===state.adminPin){adminAuthed=true;render();}
   else alert('PIN incorrecto.');
 }
+async function forceSyncResults(){
+  const btn = document.querySelector('[data-action="forceSyncResults"]');
+  const info = document.getElementById('last-sync-info');
+  if(btn){ btn.disabled=true; btn.textContent='Consultando API...'; }
+  syncStatus('saving','Consultando football-data.org...');
+  const apiMatches = await fetchWCMatches();
+  if(!apiMatches){
+    if(btn){ btn.disabled=false; btn.textContent='⚡ Actualizar resultados ahora'; }
+    if(info) info.textContent='❌ No se pudo conectar con la API. Intentá de nuevo.';
+    syncStatus('error','Error al consultar API');
+    return;
+  }
+  const finished = apiMatches.filter(m=>m.status==='FINISHED');
+  let changed=0;
+  for(const ph of state.phases){
+    for(const m of ph.matches.filter(x=>!x.result && x.home!=='Por definir')){
+      const apiM=finished.find(am=>
+        teamsMatch(am.homeTeam?.name,m.home) && teamsMatch(am.awayTeam?.name,m.away)
+      );
+      if(apiM?.score?.fullTime){
+        const h=apiM.score.fullTime.home, a=apiM.score.fullTime.away;
+        if(h!==null&&a!==null){ m.result={home:h,away:a}; changed++; }
+      }
+    }
+  }
+  const now=new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+  if(info) info.textContent= changed>0
+    ? `✅ ${changed} resultado${changed>1?'s':''} actualizados a las ${now}. Partidos finalizados en API: ${finished.length}.`
+    : `✅ Sin cambios a las ${now}. Partidos finalizados en API: ${finished.length}.`;
+  if(btn){ btn.disabled=false; btn.textContent='⚡ Actualizar resultados ahora'; }
+  if(changed>0){ await saveToCloud(); render(); syncStatus('ok','Resultados actualizados ✓'); }
+  else syncStatus('ok','Sin cambios nuevos');
+}
+
 function saveResults(){
   const ph=getPhase(currentPhase);
   document.querySelectorAll('[data-amid]').forEach(input=>{
