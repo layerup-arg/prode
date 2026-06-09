@@ -634,14 +634,51 @@ function syncStatus(type,msg){
   txt.textContent=msg;
   if(type==='ok')setTimeout(()=>{bar.className='sync-bar';txt.textContent='En línea';},2500);
 }
+const CURRENT_PHASE_IDS = ['grupos','last32','last16','cuartos','semis','final'];
+const SCHEMA_VERSION = 3; // increment when DEFAULT_PHASES structure changes
+
+function isValidPhaseStructure(phases){
+  if(!phases || phases.length === 0) return false;
+  const ids = phases.map(p=>p.id);
+  return CURRENT_PHASE_IDS.every(id => ids.includes(id));
+}
+
+function mergePhases(cloudPhases){
+  // Keeps results and lock state from cloud, rebuilds structure from DEFAULT_PHASES
+  return DEFAULT_PHASES.map(defaultPh => {
+    const cloudPh = cloudPhases.find(p => p.id === defaultPh.id);
+    if(!cloudPh) return defaultPh; // nueva fase, usar default
+    // Merge partido por partido: conservar result de la nube
+    const mergedMatches = defaultPh.matches.map(defaultM => {
+      const cloudM = cloudPh.matches?.find(m => m.id === defaultM.id);
+      return cloudM ? {...defaultM, result: cloudM.result, home: cloudM.home || defaultM.home, away: cloudM.away || defaultM.away} : defaultM;
+    });
+    return {...defaultPh, locked: cloudPh.locked ?? defaultPh.locked, matches: mergedMatches};
+  });
+}
+
 async function loadFromCloud(){
   try{
     const resp=await fetch(API_BASE+'/latest',{headers:{'X-Master-Key':MASTER_KEY}});
     const data=await resp.json();
     if(data.record){
-      if(data.record.players)state.players=data.record.players;
-      if(data.record.adminPin)state.adminPin=data.record.adminPin;
-      if(data.record.phases&&data.record.phases.length>0)state.phases=data.record.phases;
+      const rec = data.record;
+      if(rec.players) state.players = rec.players;
+      if(rec.adminPin) state.adminPin = rec.adminPin;
+
+      if(rec.phases && rec.phases.length > 0){
+        if(isValidPhaseStructure(rec.phases)){
+          // Estructura correcta — cargar directo
+          state.phases = rec.phases;
+        } else {
+          // Estructura vieja — migrar conservando resultados
+          console.log('⚠️ Migrando estructura de fases...');
+          state.phases = mergePhases(rec.phases);
+          // Guardar estructura migrada en la nube
+          saveToCloud();
+        }
+      }
+      // Si phases está vacío, usar DEFAULT_PHASES (ya está en state)
       return true;
     }
   }catch(e){syncStatus('error','Sin conexión');}
