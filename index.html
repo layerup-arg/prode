@@ -192,7 +192,36 @@ body{font-family:'Barlow',sans-serif;background:var(--dark);color:var(--light);m
 .empty{text-align:center;padding:2.5rem 1rem;color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
 .tip{font-size:12px;color:var(--muted);margin-top:.6rem;line-height:1.5;font-weight:500}
 
-/* ===== INFO BUTTON ===== */
+/* ===== MATCH DONE (resultado conocido) ===== */
+.match-done{padding:10px 0;border-bottom:1px solid var(--border);border-radius:0}
+.match-done:last-child{border-bottom:none}
+.match-done-inner{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px}
+.match-done-team{display:flex;align-items:center;gap:10px}
+.match-done-team.right{flex-direction:row-reverse;text-align:right}
+.match-done-center{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:200px}
+.match-scores-wrap{display:flex;align-items:center;gap:0;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.match-score-col{display:flex;flex-direction:column;align-items:center;padding:8px 16px;gap:3px}
+.match-score-divider{width:1px;background:var(--border);align-self:stretch}
+.score-col-label{font-family:'Barlow Condensed',sans-serif;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}
+.score-col-value{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;line-height:1;display:flex;align-items:center;gap:4px}
+.score-col-sep{font-size:16px;color:var(--muted);font-weight:700}
+.pred-value{color:rgba(255,255,255,.45)}
+.real-value{color:#fff}
+.match-pts-row{display:flex;justify-content:center}
+
+/* tint de fondo segun resultado */
+.match-exact .match-scores-wrap{border-color:rgba(0,166,81,.4);background:rgba(0,166,81,.08)}
+.match-exact .real-value{color:var(--green)}
+.match-partial .match-scores-wrap{border-color:rgba(255,209,0,.25);background:rgba(255,209,0,.05)}
+.match-miss .match-scores-wrap{border-color:rgba(232,0,29,.2);background:rgba(232,0,29,.04)}
+.match-miss .pred-value{color:rgba(255,255,255,.25)}
+
+@media(max-width:580px){
+  .match-done-center{min-width:150px}
+  .match-score-col{padding:6px 10px}
+  .score-col-value{font-size:18px}
+  .match-done-team .team-name{font-size:12px}
+}
 .info-btn{padding:5px 14px;border-radius:999px;border:1px solid rgba(255,209,0,.4);background:rgba(255,209,0,.1);color:var(--yellow);font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;transition:all .15s;margin-left:4px}
 .info-btn:hover{background:rgba(255,209,0,.2);border-color:var(--yellow)}
 
@@ -616,28 +645,65 @@ function renderPlayer(){
 function renderMatchRow(m,preds,locked,allResults){
   const pred=preds[m.id]||{home:null,away:null};
   const actual=allResults[m.id];
-  const hv=pred.home!==null?pred.home:'';
-  const av=pred.away!==null?pred.away:'';
-  const dis=locked?'disabled':'';
-  let pill='',actualStr='';
-  if(actual&&actual.home!==null&&actual.away!==null){
-    actualStr=`<div class="actual-score">Real: ${actual.home}–${actual.away}</div>`;
-    if(pred.home!==null&&pred.away!==null){
-      const{pts:mp,breakdown}=calcMatchPts(pred,actual);
+  const hasActual = actual&&actual.home!==null&&actual.away!==null;
+  const hasPred   = pred.home!==null&&pred.away!==null;
+  const hv = pred.home!==null?pred.home:'';
+  const av = pred.away!==null?pred.away:'';
+  const dis = locked?'disabled':'';
+
+  const dateStr = m.dt?`<div class="match-meta"><div class="match-date">📅 ${formatDate(m.dt)}</div></div>`:'';
+
+  if(hasActual){
+    // ── RESULTADO CONOCIDO: mostrar pronóstico + resultado real + puntos ──
+    let mp=0,breakdown=null,pillHtml='',rowClass='match-done';
+    if(hasPred){
+      const r=calcMatchPts(pred,actual);
+      mp=r.pts; breakdown=r.breakdown;
       if(breakdown==='exact'){
-        pill=`<span class="result-pill exact">⭐ +5 pts</span>`;
+        pillHtml=`<span class="result-pill exact">⭐ +5</span>`;
+        rowClass='match-done match-exact';
       } else if(mp>0){
         const reasons=[];
         if(breakdown.includes('winner'))reasons.push('ganador');
         if(breakdown.includes('homeGoals'))reasons.push('goles local');
         if(breakdown.includes('awayGoals'))reasons.push('goles visit.');
-        pill=`<span class="result-pill partial">+${mp} pts · ${reasons.join(' + ')}</span>`;
+        pillHtml=`<span class="result-pill partial">+${mp} · ${reasons.join(' + ')}</span>`;
+        rowClass='match-done match-partial';
       } else {
-        pill=`<span class="result-pill miss">0 pts</span>`;
+        pillHtml=`<span class="result-pill miss">0 pts</span>`;
+        rowClass='match-done match-miss';
       }
+    } else {
+      pillHtml=`<span class="result-pill miss">sin pronóstico</span>`;
     }
+
+    const predHomeStr = hasPred?pred.home:'–';
+    const predAwayStr = hasPred?pred.away:'–';
+
+    return`<div class="${rowClass}">
+      ${dateStr}
+      <div class="match-done-inner">
+        <div class="match-done-team left">${renderFlag(m.home)}<span class="team-name">${esc(m.home)}</span></div>
+        <div class="match-done-center">
+          <div class="match-scores-wrap">
+            <div class="match-score-col pred-col">
+              <div class="score-col-label">Tu pronóstico</div>
+              <div class="score-col-value pred-value">${predHomeStr}<span class="score-col-sep">:</span>${predAwayStr}</div>
+            </div>
+            <div class="match-score-divider"></div>
+            <div class="match-score-col real-col">
+              <div class="score-col-label">Resultado</div>
+              <div class="score-col-value real-value">${actual.home}<span class="score-col-sep">:</span>${actual.away}</div>
+            </div>
+          </div>
+          <div class="match-pts-row">${pillHtml}</div>
+        </div>
+        <div class="match-done-team right">${renderFlag(m.away)}<span class="team-name">${esc(m.away)}</span></div>
+      </div>
+    </div>`;
   }
-  const dateStr=m.dt?`<div class="match-meta"><div class="match-date">📅 ${formatDate(m.dt)}</div></div>`:'';
+
+  // ── SIN RESULTADO: inputs normales ──
   return`<div class="match">
     ${dateStr}
     <div class="team">${renderFlag(m.home)}<span class="team-name">${esc(m.home)}</span></div>
@@ -647,7 +713,6 @@ function renderMatchRow(m,preds,locked,allResults){
         <span class="score-sep">:</span>
         <input class="score-input" type="number" min="0" max="20" value="${av}" placeholder="–" data-pred="${m.id}" data-side="away" ${dis}>
       </div>
-      ${actualStr}${pill}
     </div>
     <div class="team right"><span class="team-name">${esc(m.away)}</span>${renderFlag(m.away)}</div>
   </div>`;
