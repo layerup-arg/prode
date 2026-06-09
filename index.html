@@ -299,6 +299,7 @@ const API_BASE  = 'https://api.jsonbin.io/v3/b/' + BIN_ID;
 // ============================================================
 const FD_TOKEN    = '5ff3a00a134a4a3bb424e2420b88db91';
 const FD_BASE     = 'https://api.football-data.org/v4';
+const FD_PROXY    = url => `https://corsproxy.io/?${encodeURIComponent(url)}`;
 const WC_CODE     = 'WC';   // FIFA World Cup
 let   autoSyncTimer = null;
 const AUTO_SYNC_INTERVAL = 2 * 60 * 1000; // cada 2 minutos
@@ -333,7 +334,8 @@ function teamsMatch(apiName, ourName){
 
 async function fetchWCMatches(){
   try{
-    const resp = await fetch(`${FD_BASE}/competitions/${WC_CODE}/matches`, {
+    const url = `${FD_BASE}/competitions/${WC_CODE}/matches`;
+    const resp = await fetch(FD_PROXY(url), {
       headers:{'X-Auth-Token': FD_TOKEN}
     });
     if(!resp.ok){ console.warn('football-data error:', resp.status); return null; }
