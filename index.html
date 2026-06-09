@@ -106,6 +106,7 @@ body{font-family:'Barlow',sans-serif;background:var(--dark);color:var(--light);m
 .team-flag-img{width:100%;height:100%;object-fit:cover;display:block}
 .team-flag-fallback{width:36px;height:26px;border-radius:4px;flex-shrink:0;border:1px solid rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:800;color:#fff;background:#2a2a2a;letter-spacing:.5px}
 .team-name{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:800;color:#fff;text-transform:uppercase;letter-spacing:.3px;line-height:1.2}
+.team-placeholder{color:var(--muted)!important;font-weight:600!important;font-style:italic;font-size:13px!important;text-transform:none!important}
 .score-box{display:flex;align-items:center;justify-content:center;gap:4px;flex-direction:column}
 .score-inputs{display:flex;align-items:center;gap:5px}
 .score-input{width:38px;height:38px;text-align:center;border:1px solid var(--border);border-radius:7px;font-size:18px;font-weight:800;background:rgba(255,255,255,.06);color:#fff;-moz-appearance:textfield;font-family:'Barlow Condensed',sans-serif;transition:all .15s}
@@ -345,50 +346,61 @@ async function fetchWCMatches(){
 }
 
 async function autoSyncResults(){
-  // Solo sincroniza si hay partidos sin resultado en la fase de grupos
-  const phase = state.phases.find(p=>p.id==='grupos');
-  if(!phase) return;
-  const pending = phase.matches.filter(m=>!m.result);
-  if(pending.length===0) return; // todos ya tienen resultado
+  // Check if there's anything pending across all phases
+  const anyPending = state.phases.some(ph => ph.matches.some(m => !m.result));
+  if(!anyPending) return;
 
   const apiMatches = await fetchWCMatches();
   if(!apiMatches) return;
 
-  // Solo partidos FINISHED
-  const finished = apiMatches.filter(m=>m.status==='FINISHED');
-  if(finished.length===0) return;
+  // Build lookup by fdId for fast access
+  const byFdId = {};
+  for(const am of apiMatches) byFdId[am.id] = am;
 
   let changed = false;
-  for(const m of pending){
-    // Buscar en la API el partido correspondiente por equipos
-    const apiM = finished.find(am=>
-      teamsMatch(am.homeTeam?.name, m.home) &&
-      teamsMatch(am.awayTeam?.name, m.away)
-    );
-    if(apiM && apiM.score?.fullTime){
-      const home = apiM.score.fullTime.home;
-      const away = apiM.score.fullTime.away;
-      if(home!==null && away!==null){
-        m.result = {home, away};
-        changed = true;
-        console.log(`✅ Auto-resultado: ${m.home} ${home}-${away} ${m.away}`);
-      }
-    }
-  }
 
-  // También sincronizar fases eliminatorias
-  for(const ph of state.phases.filter(p=>p.id!=='grupos')){
-    for(const m of ph.matches.filter(x=>!x.result && x.home!=='Por definir')){
-      const apiM = finished.find(am=>
-        teamsMatch(am.homeTeam?.name, m.home) &&
-        teamsMatch(am.awayTeam?.name, m.away)
-      );
-      if(apiM?.score?.fullTime){
+  for(const ph of state.phases){
+    for(const m of ph.matches){
+      if(m.result) continue; // ya tiene resultado
+
+      let apiM = null;
+
+      if(m.fdId){
+        // Knockout: buscar por ID directo
+        apiM = byFdId[m.fdId];
+        // Actualizar nombres de equipos si la API ya los conoce
+        if(apiM && apiM.homeTeam?.name && apiM.awayTeam?.name){
+          const apiHome = apiM.homeTeam.name;
+          const apiAway = apiM.awayTeam.name;
+          // Traducir nombre API → español si tenemos el mapeo inverso
+          const toSpanish = name => {
+            const entry = Object.entries(TEAM_NAME_MAP).find(([es,en])=>en===name||normalizeName(en)===normalizeName(name));
+            return entry ? entry[0] : name;
+          };
+          const newHome = toSpanish(apiHome);
+          const newAway = toSpanish(apiAway);
+          if(newHome !== m.home || newAway !== m.away){
+            m.home = newHome;
+            m.away = newAway;
+            changed = true;
+          }
+        }
+      } else {
+        // Fase de grupos: buscar por nombre de equipo
+        const finished = apiMatches.filter(x=>x.status==='FINISHED');
+        apiM = finished.find(am=>
+          teamsMatch(am.homeTeam?.name, m.home) &&
+          teamsMatch(am.awayTeam?.name, m.away)
+        );
+      }
+
+      if(apiM && apiM.status==='FINISHED' && apiM.score?.fullTime){
         const home = apiM.score.fullTime.home;
         const away = apiM.score.fullTime.away;
         if(home!==null && away!==null){
           m.result = {home, away};
           changed = true;
+          console.log(`✅ Auto-resultado: ${m.home} ${home}-${away} ${m.away}`);
         }
       }
     }
@@ -547,15 +559,65 @@ const GROUP_COLORS={
   'Grupo I':'#E8001D','Grupo J':'#0033A0','Grupo K':'#00A651','Grupo L':'#FFD100',
 };
 
-function makeKO(phase,n){
-  return Array.from({length:n},(_,i)=>({id:`${phase}_${i+1}`,home:'Por definir',away:'Por definir',result:null,dt:null}));
-}
+// ============================================================
+//  KNOCKOUT MATCHES — IDs de football-data.org + fechas + fixture
+// ============================================================
+const KO_MATCHES = {
+  // RONDA DE 32 (LAST_32) — 16 partidos
+  last32: [
+    {id:'ko_73', fdId:537417, home:'2º Grupo A', away:'2º Grupo B',           dt:'2026-06-28T16:00', result:null},
+    {id:'ko_76', fdId:537423, home:'1º Grupo C', away:'2º Grupo F',           dt:'2026-06-29T14:00', result:null},
+    {id:'ko_74', fdId:537415, home:'1º Grupo E', away:'3º Grupo A/B/C/D/F',   dt:'2026-06-29T17:30', result:null},
+    {id:'ko_75', fdId:537418, home:'1º Grupo F', away:'2º Grupo C',           dt:'2026-06-29T22:00', result:null},
+    {id:'ko_78', fdId:537424, home:'2º Grupo E', away:'2º Grupo I',           dt:'2026-06-30T14:00', result:null},
+    {id:'ko_77', fdId:537416, home:'1º Grupo I', away:'3º Grupo C/D/F/G/H',   dt:'2026-06-30T18:00', result:null},
+    {id:'ko_79', fdId:537425, home:'1º Grupo A', away:'3º Grupo C/E/F/H/I',   dt:'2026-06-30T22:00', result:null},
+    {id:'ko_80', fdId:537426, home:'1º Grupo L', away:'3º Grupo E/H/I/J/K',   dt:'2026-07-01T13:00', result:null},
+    {id:'ko_82', fdId:537422, home:'1º Grupo G', away:'3º Grupo A/E/H/I/J',   dt:'2026-07-01T17:00', result:null},
+    {id:'ko_81', fdId:537421, home:'1º Grupo D', away:'3º Grupo B/E/F/I/J',   dt:'2026-07-01T21:00', result:null},
+    {id:'ko_84', fdId:537420, home:'1º Grupo H', away:'2º Grupo J',           dt:'2026-07-02T16:00', result:null},
+    {id:'ko_83', fdId:537419, home:'2º Grupo K', away:'2º Grupo L',           dt:'2026-07-02T20:00', result:null},
+    {id:'ko_85', fdId:537429, home:'1º Grupo B', away:'3º Grupo E/F/G/I/J',   dt:'2026-07-03T00:00', result:null},
+    {id:'ko_88', fdId:537428, home:'2º Grupo D', away:'2º Grupo G',           dt:'2026-07-03T13:00', result:null},
+    {id:'ko_86', fdId:537427, home:'1º Grupo J', away:'2º Grupo H',           dt:'2026-07-03T17:00', result:null},
+    {id:'ko_87', fdId:537430, home:'1º Grupo K', away:'2º Grupo G/H/K/L',     dt:'2026-07-03T21:00', result:null},
+  ],
+  // OCTAVOS (LAST_16) — 8 partidos
+  last16: [
+    {id:'ko_89', fdId:537376, home:'Gan. M73', away:'Gan. M76', dt:'2026-07-04T14:00', result:null},
+    {id:'ko_90', fdId:537377, home:'Gan. M74', away:'Gan. M75', dt:'2026-07-04T22:00', result:null},
+    {id:'ko_91', fdId:537378, home:'Gan. M77', away:'Gan. M78', dt:'2026-07-05T21:00', result:null},
+    {id:'ko_92', fdId:537379, home:'Gan. M79', away:'Gan. M80', dt:'2026-07-06T00:00', result:null},
+    {id:'ko_93', fdId:537380, home:'Gan. M81', away:'Gan. M82', dt:'2026-07-06T20:00', result:null},
+    {id:'ko_94', fdId:537381, home:'Gan. M83', away:'Gan. M84', dt:'2026-07-07T17:00', result:null},
+    {id:'ko_95', fdId:537382, home:'Gan. M85', away:'Gan. M86', dt:'2026-07-07T21:00', result:null},
+    {id:'ko_96', fdId:537375, home:'Gan. M87', away:'Gan. M88', dt:'2026-07-08T21:00', result:null},
+  ],
+  // CUARTOS — 4 partidos
+  quarters: [
+    {id:'ko_97', fdId:537383, home:'Gan. M89', away:'Gan. M90', dt:'2026-07-09T21:00', result:null},
+    {id:'ko_98', fdId:537384, home:'Gan. M91', away:'Gan. M92', dt:'2026-07-10T20:00', result:null},
+    {id:'ko_99', fdId:537385, home:'Gan. M93', away:'Gan. M94', dt:'2026-07-11T21:00', result:null},
+    {id:'ko_100',fdId:537386, home:'Gan. M95', away:'Gan. M96', dt:'2026-07-12T20:00', result:null},
+  ],
+  // SEMIFINALES — 2 partidos
+  semis: [
+    {id:'ko_101',fdId:537387, home:'Gan. M97', away:'Gan. M98', dt:'2026-07-14T21:00', result:null},
+    {id:'ko_102',fdId:537388, home:'Gan. M99', away:'Gan. M100',dt:'2026-07-15T21:00', result:null},
+  ],
+  // FINAL — 1 partido
+  final: [
+    {id:'ko_103',fdId:537389, home:'Gan. M101',away:'Gan. M102',dt:'2026-07-19T21:00', result:null},
+  ],
+};
+
 const DEFAULT_PHASES=[
-  {id:'grupos',label:'Fase de grupos',locked:false,hasGroups:true,matches:JSON.parse(JSON.stringify(GROUP_MATCHES))},
-  {id:'octavos',label:'Octavos de final',locked:true,hasGroups:false,matches:makeKO('oct',8)},
-  {id:'cuartos',label:'Cuartos de final',locked:true,hasGroups:false,matches:makeKO('qtr',4)},
-  {id:'semis',label:'Semifinales',locked:true,hasGroups:false,matches:makeKO('sf',2)},
-  {id:'final',label:'Final',locked:true,hasGroups:false,matches:makeKO('fin',1)},
+  {id:'grupos',  label:'Fase de grupos',  locked:false, hasGroups:true,  matches:JSON.parse(JSON.stringify(GROUP_MATCHES))},
+  {id:'last32',  label:'Ronda de 32',     locked:true,  hasGroups:false, matches:JSON.parse(JSON.stringify(KO_MATCHES.last32))},
+  {id:'last16',  label:'Octavos de final',locked:true,  hasGroups:false, matches:JSON.parse(JSON.stringify(KO_MATCHES.last16))},
+  {id:'cuartos', label:'Cuartos de final',locked:true,  hasGroups:false, matches:JSON.parse(JSON.stringify(KO_MATCHES.quarters))},
+  {id:'semis',   label:'Semifinales',     locked:true,  hasGroups:false, matches:JSON.parse(JSON.stringify(KO_MATCHES.semis))},
+  {id:'final',   label:'Final',           locked:true,  hasGroups:false, matches:JSON.parse(JSON.stringify(KO_MATCHES.final))},
 ];
 
 // ============================================================
@@ -657,7 +719,15 @@ function getLeaderboard(){
     return{...p,pts,homeGoals,awayGoals,winner};
   }).sort((a,b)=>b.pts-a.pts||(b.homeGoals+b.awayGoals)-(a.homeGoals+a.awayGoals)||(b.winner-a.winner));
 }
-function initials(name){return name.trim().split(/\s+/).map(w=>w[0]).join('').toUpperCase().slice(0,2);}
+function isPlaceholder(name){
+  return !name || name==='Por definir' || name.startsWith('1º') || name.startsWith('2º') || name.startsWith('3º') || name.startsWith('Gan.');
+}
+function renderTeamName(name){
+  if(isPlaceholder(name)){
+    return `<span class="team-name team-placeholder">${esc(name||'Por definir')}</span>`;
+  }
+  return `<span class="team-name">${esc(name)}</span>`;
+}
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function formatDate(dtStr){
   if(!dtStr)return'';
@@ -814,7 +884,7 @@ function renderMatchRow(m,preds,locked,allResults){
     return`<div class="${rowClass}">
       ${dateStr}
       <div class="match-done-inner">
-        <div class="match-done-team left">${renderFlag(m.home)}<span class="team-name">${esc(m.home)}</span></div>
+        <div class="match-done-team left">${isPlaceholder(m.home)?'':renderFlag(m.home)}${renderTeamName(m.home)}</div>
         <div class="match-done-center">
           <div class="match-scores-wrap">
             <div class="match-score-col pred-col">
@@ -829,7 +899,7 @@ function renderMatchRow(m,preds,locked,allResults){
           </div>
           <div class="match-pts-row">${pillHtml}</div>
         </div>
-        <div class="match-done-team right">${renderFlag(m.away)}<span class="team-name">${esc(m.away)}</span></div>
+        <div class="match-done-team right">${renderTeamName(m.away)}${isPlaceholder(m.away)?'':renderFlag(m.away)}</div>
       </div>
     </div>`;
   }
@@ -837,7 +907,7 @@ function renderMatchRow(m,preds,locked,allResults){
   // ── SIN RESULTADO: inputs normales ──
   return`<div class="match">
     ${dateStr}
-    <div class="team">${renderFlag(m.home)}<span class="team-name">${esc(m.home)}</span></div>
+    <div class="team">${isPlaceholder(m.home)?'':renderFlag(m.home)}${renderTeamName(m.home)}</div>
     <div class="score-box">
       <div class="score-inputs">
         <input class="score-input" type="number" min="0" max="20" value="${hv}" placeholder="–" data-pred="${m.id}" data-side="home" ${dis}>
@@ -845,7 +915,7 @@ function renderMatchRow(m,preds,locked,allResults){
         <input class="score-input" type="number" min="0" max="20" value="${av}" placeholder="–" data-pred="${m.id}" data-side="away" ${dis}>
       </div>
     </div>
-    <div class="team right"><span class="team-name">${esc(m.away)}</span>${renderFlag(m.away)}</div>
+    <div class="team right">${renderTeamName(m.away)}${isPlaceholder(m.away)?'':renderFlag(m.away)}</div>
   </div>`;
 }
 
@@ -1255,6 +1325,7 @@ async function forceSyncResults(){
   const info = document.getElementById('last-sync-info');
   if(btn){ btn.disabled=true; btn.textContent='Consultando API...'; }
   syncStatus('saving','Consultando football-data.org...');
+
   const apiMatches = await fetchWCMatches();
   if(!apiMatches){
     if(btn){ btn.disabled=false; btn.textContent='⚡ Actualizar resultados ahora'; }
@@ -1262,25 +1333,44 @@ async function forceSyncResults(){
     syncStatus('error','Error al consultar API');
     return;
   }
+
+  const byFdId = {};
+  for(const am of apiMatches) byFdId[am.id] = am;
   const finished = apiMatches.filter(m=>m.status==='FINISHED');
   let changed=0;
+
   for(const ph of state.phases){
-    for(const m of ph.matches.filter(x=>!x.result && x.home!=='Por definir')){
-      const apiM=finished.find(am=>
-        teamsMatch(am.homeTeam?.name,m.home) && teamsMatch(am.awayTeam?.name,m.away)
-      );
-      if(apiM?.score?.fullTime){
+    for(const m of ph.matches){
+      if(m.result) continue;
+      let apiM = null;
+      if(m.fdId){
+        apiM = byFdId[m.fdId];
+        // Actualizar nombre de equipo si la API ya lo sabe
+        if(apiM && apiM.homeTeam?.name && apiM.awayTeam?.name){
+          const toSpanish = name => {
+            const e = Object.entries(TEAM_NAME_MAP).find(([es,en])=>en===name||normalizeName(en)===normalizeName(name));
+            return e ? e[0] : name;
+          };
+          const nh = toSpanish(apiM.homeTeam.name);
+          const na = toSpanish(apiM.awayTeam.name);
+          if(nh!==m.home||na!==m.away){ m.home=nh; m.away=na; changed++; }
+        }
+      } else {
+        apiM = finished.find(am=>teamsMatch(am.homeTeam?.name,m.home)&&teamsMatch(am.awayTeam?.name,m.away));
+      }
+      if(apiM?.status==='FINISHED'&&apiM.score?.fullTime){
         const h=apiM.score.fullTime.home, a=apiM.score.fullTime.away;
         if(h!==null&&a!==null){ m.result={home:h,away:a}; changed++; }
       }
     }
   }
+
   const now=new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
-  if(info) info.textContent= changed>0
-    ? `✅ ${changed} resultado${changed>1?'s':''} actualizados a las ${now}. Partidos finalizados en API: ${finished.length}.`
-    : `✅ Sin cambios a las ${now}. Partidos finalizados en API: ${finished.length}.`;
+  if(info) info.textContent = changed>0
+    ? `✅ ${changed} cambio${changed>1?'s':''} a las ${now} · ${finished.length} partidos finalizados en API`
+    : `✅ Sin cambios a las ${now} · ${finished.length} partidos finalizados en API`;
   if(btn){ btn.disabled=false; btn.textContent='⚡ Actualizar resultados ahora'; }
-  if(changed>0){ await saveToCloud(); render(); syncStatus('ok','Resultados actualizados ✓'); }
+  if(changed>0){ await saveToCloud(); render(); syncStatus('ok','Actualizado ✓'); }
   else syncStatus('ok','Sin cambios nuevos');
 }
 
