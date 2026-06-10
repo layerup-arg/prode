@@ -1497,6 +1497,7 @@ function bindEvents() {
   document.getElementById('overlay-unsaved')?.addEventListener('click', e => {
     if (e.target.id === 'overlay-unsaved') { modalOpen = null; pendingAction = null; render(); }
   });
+  document.getElementById('overlay-scoring')?.addEventListener('click', e => {
     if (e.target.id === 'overlay-scoring') { modalOpen = null; render(); }
   });
   document.getElementById('overlay-group-table')?.addEventListener('click', e => {
