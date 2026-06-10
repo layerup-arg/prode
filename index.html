@@ -91,7 +91,24 @@ body{font-family:'Barlow',sans-serif;background:var(--dark);color:var(--light);m
 .group-table-btn{background:rgba(255,255,255,.07);border:1px solid var(--border);color:var(--muted);font-size:13px;padding:2px 8px;border-radius:6px;cursor:pointer;margin-left:auto;transition:all .15s;line-height:1;font-family:inherit}
 .group-table-btn:hover{background:rgba(255,255,255,.15);color:#fff;border-color:rgba(255,255,255,.3)}
 
-/* GROUP TABLE MODAL */
+/* GROUP TABS */
+.group-tabs-wrap{margin-bottom:1rem}
+.group-tabs{display:flex;gap:5px;flex-wrap:wrap}
+.group-tab{position:relative;width:42px;height:42px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,.04);font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:900;color:var(--muted);cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;padding-bottom:6px}
+.group-tab:hover{color:#fff;border-color:rgba(255,255,255,.3)}
+.group-tab.active{background:var(--yellow);color:#000;border-color:var(--yellow)}
+/* indicator dot */
+.gtab-dot{position:absolute;bottom:5px;left:50%;transform:translateX(-50%);width:5px;height:5px;border-radius:50%}
+.gtab-complete .gtab-dot{background:var(--green)}
+.gtab-partial  .gtab-dot{background:var(--yellow)}
+.gtab-empty    .gtab-dot{background:rgba(255,255,255,.2)}
+.group-tab.active .gtab-dot{background:rgba(0,0,0,.4)}
+/* group header row */
+.group-header{display:flex;align-items:center;gap:8px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--muted);padding:10px 0 8px;border-bottom:1px solid var(--border);margin-bottom:4px}
+
+/* OLD group-label kept for admin view */
+.group-label{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);padding:14px 0 7px;border-bottom:1px solid var(--border);margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.group-label:not(:first-child){margin-top:14px}
 .gt-table{width:100%;border-collapse:collapse;margin-top:.75rem}
 .gt-table th{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);padding:5px 8px;border-bottom:1px solid var(--border);text-align:center}
 .gt-table th.left{text-align:left}
@@ -755,6 +772,7 @@ function pillHTML(pred, actual) {
 let view = 'home';        // home | player | leaderboard | admin
 let currentPlayer = null; // player id
 let currentPhase  = 'grupos';
+let currentGroup  = null; // active group tab when in fase de grupos
 let adminAuthed   = false;
 let modalOpen     = null; // 'addPlayer' | 'playerPin' | 'scoringInfo' | 'groupTable'
 let groupTableFor = null; // grupo name when modalOpen === 'groupTable'
@@ -858,31 +876,66 @@ function renderPlayer() {
 
   const ph  = state.phases.find(p => p.id === currentPhase);
   const pal = playerColor(player.name);
+  const preds = player.predictions || {};
 
-  const tabs = state.phases.map(p =>
+  // Phase tabs (Grupos / Ronda 32 / etc.)
+  const phaseTabs = state.phases.map(p =>
     `<button class="phase-tab${p.id === currentPhase ? ' active' : ''}${p.locked ? ' locked' : ''}" data-phase="${p.id}">
       ${p.locked ? '🔒 ' : ''}${p.label}
     </button>`
   ).join('');
 
   let matchesHTML = '';
+
   if (ph.hasGroups) {
+    // Build group map
     const byGroup = {};
     for (const m of ph.matches) {
       if (!byGroup[m.group]) byGroup[m.group] = [];
       byGroup[m.group].push(m);
     }
+    const groupNames = Object.keys(byGroup); // A–L
+
+    // Compute completion per group
+    const groupStatus = {}; // 'complete' | 'partial' | 'empty'
     for (const [grp, ms] of Object.entries(byGroup)) {
-      const col = GROUP_COLORS[grp] || '#FFD100';
-      matchesHTML += `<div class="group-label">
-        <span class="group-dot" style="background:${col}"></span>
-        ${grp}
-        <button class="group-table-btn" data-action="openGroupTable" data-group="${grp}" title="Ver tabla simulada">📊</button>
-      </div>`;
-      matchesHTML += ms.map(m => renderMatchRow(m, player.predictions, ph.locked)).join('');
+      const filled = ms.filter(m => preds[m.id]?.home != null && preds[m.id]?.away != null).length;
+      groupStatus[grp] = filled === ms.length ? 'complete' : filled > 0 ? 'partial' : 'empty';
     }
+
+    // Default to first incomplete group if currentGroup not set or not in list
+    if (!currentGroup || !groupNames.includes(currentGroup)) {
+      currentGroup = groupNames.find(g => groupStatus[g] !== 'complete') || groupNames[0];
+    }
+
+    // Group letter tabs
+    const groupTabs = groupNames.map(grp => {
+      const letter = grp.replace('Grupo ', '');
+      const status = groupStatus[grp];
+      const indicator = status === 'complete' ? 'gtab-complete' : status === 'partial' ? 'gtab-partial' : 'gtab-empty';
+      const isActive = grp === currentGroup;
+      return `<button class="group-tab${isActive ? ' active' : ''} ${indicator}" data-groupsel="${grp}" title="${grp}">
+        ${letter}
+        <span class="gtab-dot"></span>
+      </button>`;
+    }).join('');
+
+    // Matches of selected group
+    const col = GROUP_COLORS[currentGroup] || '#FFD100';
+    const activeMatches = byGroup[currentGroup] || [];
+    matchesHTML = `
+      <div class="group-tabs-wrap">
+        <div class="group-tabs">${groupTabs}</div>
+      </div>
+      <div class="group-header">
+        <span class="group-dot" style="background:${col}"></span>
+        <span>${currentGroup}</span>
+        <button class="group-table-btn" data-action="openGroupTable" data-group="${currentGroup}" title="Ver tabla simulada">📊</button>
+      </div>
+      ${activeMatches.map(m => renderMatchRow(m, preds, ph.locked)).join('')}
+    `;
   } else {
-    matchesHTML = ph.matches.map(m => renderMatchRow(m, player.predictions, ph.locked)).join('');
+    matchesHTML = ph.matches.map(m => renderMatchRow(m, preds, ph.locked)).join('');
   }
 
   return `
@@ -894,7 +947,7 @@ function renderPlayer() {
         <div class="player-header-sub">Exacto = 5 pts &nbsp;·&nbsp; Goles exactos = 2 pts &nbsp;·&nbsp; Ganador = 1 pt</div>
       </div>
     </div>
-    <div class="phase-tabs">${tabs}</div>
+    <div class="phase-tabs">${phaseTabs}</div>
     ${ph.locked ? `<div class="phase-locked-msg">🔒 Fase cerrada — los pronósticos ya no se pueden modificar</div>` : ''}
     <div class="section">
       <div class="section-title">
@@ -1336,7 +1389,16 @@ function bindEvents() {
 
   // Phase tabs
   document.querySelectorAll('[data-phase]').forEach(el =>
-    el.addEventListener('click', () => { currentPhase = el.dataset.phase; render(); })
+    el.addEventListener('click', () => {
+      currentPhase = el.dataset.phase;
+      currentGroup = null; // reset group on phase change
+      render();
+    })
+  );
+
+  // Group letter tabs
+  document.querySelectorAll('[data-groupsel]').forEach(el =>
+    el.addEventListener('click', () => { currentGroup = el.dataset.groupsel; render(); })
   );
 
   // Action buttons
@@ -1414,6 +1476,7 @@ function handleAction() {
   // ---- PLAYER PIN ----
   else if (a === 'openPlayerPin') {
     currentPlayer = this.dataset.pid;
+    currentGroup  = null; // will auto-select first incomplete group
     pinError = '';
     modalOpen = 'playerPin';
     render();
