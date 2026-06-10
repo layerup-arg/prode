@@ -780,8 +780,9 @@ let currentPlayer = null; // player id
 let currentPhase  = 'grupos';
 let currentGroup  = null; // active group tab when in fase de grupos
 let dirtyPreds    = false; // unsaved prediction changes
+let pendingAction = null; // queued action to execute after unsaved modal confirm
 let adminAuthed   = false;
-let modalOpen     = null; // 'addPlayer' | 'playerPin' | 'scoringInfo' | 'groupTable'
+let modalOpen     = null; // 'addPlayer' | 'playerPin' | 'scoringInfo' | 'groupTable' | 'unsaved'
 let groupTableFor = null; // grupo name when modalOpen === 'groupTable'
 let pinError      = '';
 
@@ -796,6 +797,7 @@ function render() {
   if (modalOpen === 'playerPin')   html += renderPlayerPinModal();
   if (modalOpen === 'scoringInfo') html += renderScoringInfoModal();
   if (modalOpen === 'groupTable')  html += renderGroupTableModal();
+  if (modalOpen === 'unsaved')     html += renderUnsavedModal();
   if      (view === 'home')        html += renderHome();
   else if (view === 'player')      html += renderPlayer();
   else if (view === 'leaderboard') html += renderLeaderboard();
@@ -1358,6 +1360,29 @@ function renderGroupTableModal() {
   </div>`;
 }
 
+function renderUnsavedModal() {
+  return `<div class="overlay" id="overlay-unsaved">
+    <div class="modal" style="max-width:360px;text-align:center">
+      <div style="font-size:40px;margin-bottom:.75rem;filter:drop-shadow(0 0 12px rgba(255,209,0,.5))">⚠️</div>
+      <h2 style="font-size:22px;margin-bottom:.5rem">Cambios sin grabar</h2>
+      <p style="font-size:14px;color:var(--muted);margin-bottom:1.5rem;line-height:1.6;font-family:'Barlow',sans-serif;font-weight:400">
+        Tenés pronósticos modificados que todavía no se guardaron.<br>¿Qué querés hacer?
+      </p>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button class="btn primary" style="width:100%;font-size:15px" data-action="unsavedSaveAndContinue">
+          💾 Grabar y continuar
+        </button>
+        <button class="btn danger" style="width:100%" data-action="unsavedDiscardAndContinue">
+          🗑 Descartar cambios
+        </button>
+        <button class="btn" style="width:100%" data-action="unsavedCancel">
+          Volver a editar
+        </button>
+      </div>
+    </div>
+  </div>`;
+}
+
 function renderAddPlayerModal() {
   return `<div class="overlay" id="overlay">
     <div class="modal">
@@ -1400,17 +1425,21 @@ function bindEvents() {
   // Phase tabs
   document.querySelectorAll('[data-phase]').forEach(el =>
     el.addEventListener('click', () => {
-      if (dirtyPreds && !confirm('Tenés cambios sin guardar en esta fase. ¿Cambiar sin grabar?')) return;
-      dirtyPreds = false;
-      currentPhase = el.dataset.phase;
-      currentGroup = null;
-      render();
+      const action = () => { dirtyPreds = false; currentPhase = el.dataset.phase; currentGroup = null; render(); };
+      if (dirtyPreds) { pendingAction = action; modalOpen = 'unsaved'; render(); }
+      else action();
     })
   );
 
   // Group letter tabs
   document.querySelectorAll('[data-groupsel]').forEach(el =>
-    el.addEventListener('click', () => { currentGroup = el.dataset.groupsel; render(); })
+    el.addEventListener('click', () => {
+      const grp = el.dataset.groupsel;
+      if (grp === currentGroup) return;
+      const action = () => { dirtyPreds = false; currentGroup = grp; render(); };
+      if (dirtyPreds) { pendingAction = action; modalOpen = 'unsaved'; render(); }
+      else action();
+    })
   );
 
   // Action buttons
@@ -1465,7 +1494,9 @@ function bindEvents() {
   document.getElementById('overlay')?.addEventListener('click', e => {
     if (e.target.id === 'overlay') { modalOpen = null; currentPlayer = null; pinError = ''; render(); }
   });
-  document.getElementById('overlay-scoring')?.addEventListener('click', e => {
+  document.getElementById('overlay-unsaved')?.addEventListener('click', e => {
+    if (e.target.id === 'overlay-unsaved') { modalOpen = null; pendingAction = null; render(); }
+  });
     if (e.target.id === 'overlay-scoring') { modalOpen = null; render(); }
   });
   document.getElementById('overlay-group-table')?.addEventListener('click', e => {
@@ -1480,14 +1511,24 @@ function handleAction() {
   const a = this.dataset.action;
 
   // ---- NAVIGATION ----
-  if (a === 'goHome')            {
-    if (dirtyPreds && !confirm('Tenés cambios sin guardar. ¿Salir sin grabar?')) return;
-    dirtyPreds = false;
-    view = 'home'; currentPlayer = null; render();
+  if (a === 'goHome') {
+    const action = () => { dirtyPreds = false; view = 'home'; currentPlayer = null; render(); };
+    if (dirtyPreds) { pendingAction = action; modalOpen = 'unsaved'; render(); }
+    else action();
   }
   else if (a === 'savePredictions') { savePredictions(); }
   else if (a === 'openScoringInfo') { modalOpen = 'scoringInfo'; render(); }
-  else if (a === 'closeScoringInfo') { modalOpen = null; render(); }
+  else if (a === 'unsavedSaveAndContinue') { 
+    modalOpen = null;
+    savePredictions().then(() => { if (pendingAction) { pendingAction(); pendingAction = null; } });
+  }
+  else if (a === 'unsavedDiscardAndContinue') {
+    modalOpen = null; dirtyPreds = false;
+    if (pendingAction) { pendingAction(); pendingAction = null; }
+  }
+  else if (a === 'unsavedCancel') {
+    modalOpen = null; pendingAction = null; render();
+  }
   else if (a === 'openGroupTable') { groupTableFor = this.dataset.group; modalOpen = 'groupTable'; render(); }
   else if (a === 'closeGroupTable') { modalOpen = null; groupTableFor = null; render(); }
   else if (a === 'closeModal')   { modalOpen = null; currentPlayer = null; pinError = ''; render(); }
