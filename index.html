@@ -88,6 +88,24 @@ body{font-family:'Barlow',sans-serif;background:var(--dark);color:var(--light);m
 .group-label{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);padding:14px 0 7px;border-bottom:1px solid var(--border);margin-bottom:4px;display:flex;align-items:center;gap:8px}
 .group-label:not(:first-child){margin-top:14px}
 .group-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.group-table-btn{background:rgba(255,255,255,.07);border:1px solid var(--border);color:var(--muted);font-size:13px;padding:2px 8px;border-radius:6px;cursor:pointer;margin-left:auto;transition:all .15s;line-height:1;font-family:inherit}
+.group-table-btn:hover{background:rgba(255,255,255,.15);color:#fff;border-color:rgba(255,255,255,.3)}
+
+/* GROUP TABLE MODAL */
+.gt-table{width:100%;border-collapse:collapse;margin-top:.75rem}
+.gt-table th{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);padding:5px 8px;border-bottom:1px solid var(--border);text-align:center}
+.gt-table th.left{text-align:left}
+.gt-table td{padding:9px 8px;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px;vertical-align:middle}
+.gt-table td.center{text-align:center}
+.gt-table tr:last-child td{border-bottom:none}
+.gt-rank{font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:800;color:var(--muted);text-align:center;width:24px}
+.gt-rank.q{color:var(--green)}
+.gt-rank.q3{color:var(--yellow)}
+.gt-team{display:flex;align-items:center;gap:8px}
+.gt-pts{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:900;color:var(--yellow);text-align:center}
+.gt-stat{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:600;color:var(--muted);text-align:center}
+.gt-gd.pos{color:var(--green)}.gt-gd.neg{color:#ff6b7a}.gt-gd.zero{color:var(--muted)}
+.gt-note{font-size:11px;color:var(--muted);margin-top:.75rem;line-height:1.5;padding:8px 12px;background:rgba(255,255,255,.04);border-radius:6px;border-left:3px solid var(--yellow)}
 
 /* MATCH ROW */
 .match{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--border)}
@@ -738,7 +756,8 @@ let view = 'home';        // home | player | leaderboard | admin
 let currentPlayer = null; // player id
 let currentPhase  = 'grupos';
 let adminAuthed   = false;
-let modalOpen     = null; // 'addPlayer' | 'playerPin' | 'scoringInfo'
+let modalOpen     = null; // 'addPlayer' | 'playerPin' | 'scoringInfo' | 'groupTable'
+let groupTableFor = null; // grupo name when modalOpen === 'groupTable'
 let pinError      = '';
 
 // ============================================================
@@ -751,6 +770,7 @@ function render() {
   if (modalOpen === 'addPlayer')   html += renderAddPlayerModal();
   if (modalOpen === 'playerPin')   html += renderPlayerPinModal();
   if (modalOpen === 'scoringInfo') html += renderScoringInfoModal();
+  if (modalOpen === 'groupTable')  html += renderGroupTableModal();
   if      (view === 'home')        html += renderHome();
   else if (view === 'player')      html += renderPlayer();
   else if (view === 'leaderboard') html += renderLeaderboard();
@@ -854,7 +874,11 @@ function renderPlayer() {
     }
     for (const [grp, ms] of Object.entries(byGroup)) {
       const col = GROUP_COLORS[grp] || '#FFD100';
-      matchesHTML += `<div class="group-label"><span class="group-dot" style="background:${col}"></span>${grp}</div>`;
+      matchesHTML += `<div class="group-label">
+        <span class="group-dot" style="background:${col}"></span>
+        ${grp}
+        <button class="group-table-btn" data-action="openGroupTable" data-group="${grp}" title="Ver tabla simulada">📊</button>
+      </div>`;
       matchesHTML += ms.map(m => renderMatchRow(m, player.predictions, ph.locked)).join('');
     }
   } else {
@@ -1151,6 +1175,126 @@ function renderAdminLogin() {
 }
 
 // ——— ADD PLAYER MODAL ———
+function simulateGroup(groupName, predictions) {
+  const ph = state.phases.find(p => p.id === 'grupos');
+  if (!ph) return [];
+  const matches = ph.matches.filter(m => m.group === groupName);
+
+  // Get all teams in this group
+  const teamsSet = new Set();
+  matches.forEach(m => { teamsSet.add(m.home); teamsSet.add(m.away); });
+  const teams = [...teamsSet];
+
+  // Init standings
+  const standings = Object.fromEntries(teams.map(t => ([t, {
+    team: t, pts: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, gd: 0, played: 0
+  }])));
+
+  for (const m of matches) {
+    // Use prediction if available, otherwise actual result
+    const pred = predictions[m.id];
+    const actual = m.result;
+    const score = actual?.home != null ? actual : (pred?.home != null ? pred : null);
+    if (!score) continue;
+
+    const h = score.home, a = score.away;
+    const sH = standings[m.home], sA = standings[m.away];
+    if (!sH || !sA) continue;
+
+    sH.played++; sA.played++;
+    sH.gf += h; sH.ga += a; sH.gd += h - a;
+    sA.gf += a; sA.ga += h; sA.gd += a - h;
+
+    if (h > a)       { sH.pts += 3; sH.w++; sA.l++; }
+    else if (h < a)  { sA.pts += 3; sA.w++; sH.l++; }
+    else             { sH.pts += 1; sA.pts += 1; sH.d++; sA.d++; }
+  }
+
+  return Object.values(standings).sort((a, b) =>
+    b.pts - a.pts || b.gd - a.gd || b.gf - a.gf || a.team.localeCompare(b.team)
+  );
+}
+
+function renderGroupTableModal() {
+  if (!groupTableFor) return '';
+  const player = state.players.find(p => p.id === currentPlayer);
+  const predictions = player?.predictions || {};
+  const rows = simulateGroup(groupTableFor, predictions);
+  const col = GROUP_COLORS[groupTableFor] || '#FFD100';
+
+  // Check how many matches have predictions
+  const ph = state.phases.find(p => p.id === 'grupos');
+  const groupMatches = ph.matches.filter(m => m.group === groupTableFor);
+  const withPred = groupMatches.filter(m => {
+    const p = predictions[m.id];
+    return p?.home != null && p?.away != null;
+  }).length;
+  const withResult = groupMatches.filter(m => m.result?.home != null).length;
+
+  const tableRows = rows.map((s, i) => {
+    // Top 2 qualify directly, pos 3 might qualify as best 3rd
+    const rankClass = i < 2 ? 'q' : i === 2 ? 'q3' : '';
+    const gdClass = s.gd > 0 ? 'pos' : s.gd < 0 ? 'neg' : 'zero';
+    const gdStr = s.gd > 0 ? '+' + s.gd : String(s.gd);
+    const iso = FLAG_ISO[s.team];
+    const flagEl = iso
+      ? `<div class="team-flag" style="width:24px;height:18px;flex-shrink:0"><img src="https://flagcdn.com/w40/${iso}.png" style="width:100%;height:100%;object-fit:cover;display:block" loading="lazy"></div>`
+      : `<div class="team-flag-fb" style="width:24px;height:18px;font-size:9px">${initials(s.team)}</div>`;
+    return `<tr>
+      <td class="gt-rank ${rankClass}">${i + 1}</td>
+      <td>
+        <div class="gt-team">${flagEl}<span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:#fff;text-transform:uppercase">${esc(s.team)}</span></div>
+      </td>
+      <td class="gt-pts">${s.pts}</td>
+      <td class="gt-stat">${s.played}</td>
+      <td class="gt-stat">${s.w}</td>
+      <td class="gt-stat">${s.d}</td>
+      <td class="gt-stat">${s.l}</td>
+      <td class="gt-stat">${s.gf}:${s.ga}</td>
+      <td class="gt-stat gt-gd ${gdClass}">${gdStr}</td>
+    </tr>`;
+  }).join('');
+
+  const caption = withResult > 0
+    ? `${withResult} resultado${withResult>1?'s':''} real${withResult>1?'es':''} + ${withPred - withResult} pronóstico${withPred-withResult>1?'s':''} tuyo${withPred-withResult>1?'s':''}`
+    : withPred > 0
+      ? `Simulado con ${withPred} de 6 pronósticos tuyos`
+      : 'Todavía no cargaste pronósticos para este grupo';
+
+  return `<div class="overlay" id="overlay-group-table">
+    <div class="modal" style="max-width:480px">
+      <h2 style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <span style="display:flex;align-items:center;gap:10px">
+          <span style="width:10px;height:10px;border-radius:50%;background:${col};display:inline-block;flex-shrink:0"></span>
+          ${groupTableFor}
+        </span>
+        <button class="modal-close" data-action="closeGroupTable">✕</button>
+      </h2>
+      <table class="gt-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th class="left">Equipo</th>
+            <th>Pts</th>
+            <th>PJ</th>
+            <th>G</th>
+            <th>E</th>
+            <th>P</th>
+            <th>GF:GC</th>
+            <th>Dif</th>
+          </tr>
+        </thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+      <div class="gt-note">
+        <span style="color:var(--green);font-weight:700">█</span> Clasifica directo &nbsp;
+        <span style="color:var(--yellow);font-weight:700">█</span> Posible mejor 3ro
+        <br><span style="color:var(--muted)">${caption}</span>
+      </div>
+    </div>
+  </div>`;
+}
+
 function renderAddPlayerModal() {
   return `<div class="overlay" id="overlay">
     <div class="modal">
@@ -1248,6 +1392,9 @@ function bindEvents() {
   document.getElementById('overlay-scoring')?.addEventListener('click', e => {
     if (e.target.id === 'overlay-scoring') { modalOpen = null; render(); }
   });
+  document.getElementById('overlay-group-table')?.addEventListener('click', e => {
+    if (e.target.id === 'overlay-group-table') { modalOpen = null; groupTableFor = null; render(); }
+  });
 }
 
 // ============================================================
@@ -1260,6 +1407,8 @@ function handleAction() {
   if (a === 'goHome')            { view = 'home'; currentPlayer = null; render(); }
   else if (a === 'openScoringInfo') { modalOpen = 'scoringInfo'; render(); }
   else if (a === 'closeScoringInfo') { modalOpen = null; render(); }
+  else if (a === 'openGroupTable') { groupTableFor = this.dataset.group; modalOpen = 'groupTable'; render(); }
+  else if (a === 'closeGroupTable') { modalOpen = null; groupTableFor = null; render(); }
   else if (a === 'closeModal')   { modalOpen = null; currentPlayer = null; pinError = ''; render(); }
 
   // ---- PLAYER PIN ----
