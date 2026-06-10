@@ -371,29 +371,45 @@ const DB = {
 // MATCH DATA
 // ============================================================
 const FLAG_ISO = {
-  'México':'mx','Ecuador':'ec','Qatar':'qa','Senegal':'sn','Estados Unidos':'us',
-  'Países Bajos':'nl','Panamá':'pa','Angola':'ao','Argentina':'ar','Nigeria':'ng',
-  'Canadá':'ca','Marruecos':'ma','España':'es','Brasil':'br','Japón':'jp','Serbia':'rs',
-  'Francia':'fr','Alemania':'de','Uruguay':'uy','Portugal':'pt','Inglaterra':'gb-eng',
-  'Bélgica':'be','Australia':'au','Suiza':'ch','Colombia':'co','Croacia':'hr',
-  'Arabia Saudita':'sa','Polonia':'pl','Corea del Sur':'kr','Ghana':'gh',
-  'Costa Rica':'cr','Nueva Zelanda':'nz','Irán':'ir','Camerún':'cm','Turquía':'tr',
-  'Túnez':'tn','Rumania':'ro','Argelia':'dz','Perú':'pe','República Checa':'cz',
-  'Venezuela':'ve','Irak':'iq','Kenia':'ke','Dinamarca':'dk',
+  // Grupo A
+  'México':'mx','Corea del Sur':'kr','Sudáfrica':'za','República Checa':'cz',
+  // Grupo B
+  'Canadá':'ca','Bosnia-Herzegovina':'ba','Qatar':'qa','Suiza':'ch',
+  // Grupo C
+  'Brasil':'br','Marruecos':'ma','Haití':'ht','Escocia':'gb-sct',
+  // Grupo D
+  'Estados Unidos':'us','Paraguay':'py','Australia':'au','Turquía':'tr',
+  // Grupo E
+  'Alemania':'de','Curazao':'cw','Costa de Marfil':'ci','Ecuador':'ec',
+  // Grupo F
+  'Países Bajos':'nl','Japón':'jp','Túnez':'tn',
+  // Grupo G
+  'Bélgica':'be','Egipto':'eg','Irán':'ir','Nueva Zelanda':'nz',
+  // Grupo H
+  'España':'es','Cabo Verde':'cv','Arabia Saudita':'sa','Uruguay':'uy',
+  // Grupo I
+  'Francia':'fr','Senegal':'sn','Noruega':'no',
+  // Grupo J
+  'Argentina':'ar','Argelia':'dz','Austria':'at','Jordania':'jo',
+  // Grupo K
+  'Portugal':'pt','Colombia':'co','Uzbekistán':'uz',
+  // Grupo L
+  'Inglaterra':'gb-eng','Croacia':'hr','Ghana':'gh','Panamá':'pa',
 };
 
 const TEAM_EN = {
-  'México':'Mexico','Ecuador':'Ecuador','Qatar':'Qatar','Senegal':'Senegal',
-  'Estados Unidos':'USA','Países Bajos':'Netherlands','Panamá':'Panama','Angola':'Angola',
-  'Argentina':'Argentina','Nigeria':'Nigeria','Canadá':'Canada','Marruecos':'Morocco',
-  'España':'Spain','Brasil':'Brazil','Japón':'Japan','Serbia':'Serbia',
-  'Francia':'France','Alemania':'Germany','Uruguay':'Uruguay','Portugal':'Portugal',
-  'Inglaterra':'England','Bélgica':'Belgium','Australia':'Australia','Suiza':'Switzerland',
-  'Colombia':'Colombia','Croacia':'Croatia','Arabia Saudita':'Saudi Arabia','Polonia':'Poland',
-  'Corea del Sur':'South Korea','Ghana':'Ghana','Costa Rica':'Costa Rica','Nueva Zelanda':'New Zealand',
-  'Irán':'Iran','Camerún':'Cameroon','Turquía':'Türkiye','Túnez':'Tunisia',
-  'Rumania':'Romania','Argelia':'Algeria','Perú':'Peru','República Checa':'Czechia',
-  'Venezuela':'Venezuela','Irak':'Iraq','Kenia':'Kenya','Dinamarca':'Denmark',
+  'México':'Mexico','Corea del Sur':'South Korea','Sudáfrica':'South Africa','República Checa':'Czechia',
+  'Canadá':'Canada','Bosnia-Herzegovina':'Bosnia and Herzegovina','Qatar':'Qatar','Suiza':'Switzerland',
+  'Brasil':'Brazil','Marruecos':'Morocco','Haití':'Haiti','Escocia':'Scotland',
+  'Estados Unidos':'USA','Paraguay':'Paraguay','Australia':'Australia','Turquía':'Türkiye',
+  'Alemania':'Germany','Curazao':'Curaçao','Costa de Marfil':"Côte d'Ivoire",'Ecuador':'Ecuador',
+  'Países Bajos':'Netherlands','Japón':'Japan','Túnez':'Tunisia',
+  'Bélgica':'Belgium','Egipto':'Egypt','Irán':'Iran','Nueva Zelanda':'New Zealand',
+  'España':'Spain','Cabo Verde':'Cape Verde','Arabia Saudita':'Saudi Arabia','Uruguay':'Uruguay',
+  'Francia':'France','Senegal':'Senegal','Noruega':'Norway',
+  'Argentina':'Argentina','Argelia':'Algeria','Austria':'Austria','Jordania':'Jordan',
+  'Portugal':'Portugal','Colombia':'Colombia','Uzbekistán':'Uzbekistan',
+  'Inglaterra':'England','Croacia':'Croatia','Ghana':'Ghana','Panamá':'Panama',
 };
 
 const GROUP_COLORS = {
@@ -410,20 +426,73 @@ const PLAYER_COLORS = [
 ];
 
 function makeGroups() {
+  // Grupos verificados del sorteo oficial FIFA World Cup 2026
+  // Fuentes: Britannica, NBC Sports, imagen oficial FIFA
   const groups = {
-    'Grupo A':['México','Ecuador','Qatar','Senegal'],
-    'Grupo B':['Estados Unidos','Países Bajos','Panamá','Angola'],
-    'Grupo C':['Argentina','Nigeria','Canadá','Marruecos'],
-    'Grupo D':['España','Brasil','Japón','Serbia'],
-    'Grupo E':['Francia','Alemania','Uruguay','Portugal'],
-    'Grupo F':['Inglaterra','Bélgica','Australia','Suiza'],
-    'Grupo G':['Colombia','Croacia','Arabia Saudita','Polonia'],
-    'Grupo H':['Corea del Sur','Ghana','Costa Rica','Nueva Zelanda'],
-    'Grupo I':['Irán','Camerún','Turquía','Túnez'],
-    'Grupo J':['Rumania','Argelia','Perú','República Checa'],
-    'Grupo K':['Países Bajos','Venezuela','Perú','República Checa'],
-    'Grupo L':['Dinamarca','Senegal','Irak','Kenia'],
+    'Grupo A': ['México','Corea del Sur','Sudáfrica','República Checa'],
+    'Grupo B': ['Canadá','Bosnia-Herzegovina','Qatar','Suiza'],
+    'Grupo C': ['Brasil','Marruecos','Haití','Escocia'],
+    'Grupo D': ['Estados Unidos','Paraguay','Australia','Turquía'],
+    'Grupo E': ['Alemania','Curazao','Costa de Marfil','Ecuador'],
+    'Grupo F': ['Países Bajos','Japón','Túnez','Play-off B'],
+    'Grupo G': ['Bélgica','Egipto','Irán','Nueva Zelanda'],
+    'Grupo H': ['España','Cabo Verde','Arabia Saudita','Uruguay'],
+    'Grupo I': ['Francia','Senegal','Noruega','Play-off 2'],
+    'Grupo J': ['Argentina','Argelia','Austria','Jordania'],
+    'Grupo K': ['Portugal','Colombia','Uzbekistán','Play-off 1'],
+    'Grupo L': ['Inglaterra','Croacia','Ghana','Panamá'],
   };
+  // Fechas de los partidos (hora Argentina UTC-3)
+  const dates = {
+    // Grupo A
+    g1:'2026-06-11T21:00',g2:'2026-06-11T18:00',g3:'2026-06-16T18:00',
+    g4:'2026-06-16T21:00',g5:'2026-06-20T20:00',g6:'2026-06-20T20:00',
+    // Grupo B
+    g7:'2026-06-12T21:00',g8:'2026-06-13T00:00',g9:'2026-06-17T18:00',
+    g10:'2026-06-17T21:00',g11:'2026-06-21T20:00',g12:'2026-06-21T20:00',
+    // Grupo C
+    g13:'2026-06-13T18:00',g14:'2026-06-13T21:00',g15:'2026-06-18T18:00',
+    g16:'2026-06-18T21:00',g17:'2026-06-22T20:00',g18:'2026-06-22T20:00',
+    // Grupo D
+    g19:'2026-06-12T18:00',g20:'2026-06-12T21:00',g21:'2026-06-17T00:00',
+    g22:'2026-06-17T15:00',g23:'2026-06-21T00:00',g24:'2026-06-21T00:00',
+    // Grupo E
+    g25:'2026-06-14T18:00',g26:'2026-06-14T21:00',g27:'2026-06-19T18:00',
+    g28:'2026-06-19T21:00',g29:'2026-06-23T20:00',g30:'2026-06-23T20:00',
+    // Grupo F
+    g31:'2026-06-15T18:00',g32:'2026-06-15T21:00',g33:'2026-06-20T18:00',
+    g34:'2026-06-20T00:00',g35:'2026-06-24T20:00',g36:'2026-06-24T20:00',
+    // Grupo G
+    g37:'2026-06-16T18:00',g38:'2026-06-16T21:00',g39:'2026-06-21T18:00',
+    g40:'2026-06-21T00:00',g41:'2026-06-25T20:00',g42:'2026-06-25T20:00',
+    // Grupo H
+    g43:'2026-06-16T00:00',g44:'2026-06-16T15:00',g45:'2026-06-20T15:00',
+    g46:'2026-06-20T21:00',g47:'2026-06-24T20:00',g48:'2026-06-24T20:00',
+    // Grupo I
+    g49:'2026-06-18T00:00',g50:'2026-06-18T15:00',g51:'2026-06-22T18:00',
+    g52:'2026-06-22T21:00',g53:'2026-06-26T20:00',g54:'2026-06-26T20:00',
+    // Grupo J
+    g55:'2026-06-19T00:00',g56:'2026-06-19T15:00',g57:'2026-06-23T18:00',
+    g58:'2026-06-23T21:00',g59:'2026-06-27T20:00',g60:'2026-06-27T20:00',
+    // Grupo K
+    g61:'2026-06-20T15:00',g62:'2026-06-20T18:00',g63:'2026-06-24T18:00',
+    g64:'2026-06-24T00:00',g65:'2026-06-28T20:00',g66:'2026-06-28T20:00',
+    // Grupo L
+    g67:'2026-06-21T15:00',g68:'2026-06-21T21:00',g69:'2026-06-25T18:00',
+    g70:'2026-06-25T21:00',g71:'2026-06-29T20:00',g72:'2026-06-29T20:00',
+  };
+  const matches = [];
+  let id = 1;
+  for (const [grp, teams] of Object.entries(groups)) {
+    for (let i = 0; i < teams.length; i++) {
+      for (let j = i + 1; j < teams.length; j++) {
+        const mid = 'g' + id++;
+        matches.push({ id: mid, group: grp, home: teams[i], away: teams[j], dt: dates[mid] || null, result: null });
+      }
+    }
+  }
+  return matches;
+}
   const dates = {
     g1:'2026-06-11T21:00',g2:'2026-06-12T00:00',g3:'2026-06-16T18:00',g4:'2026-06-16T21:00',g5:'2026-06-20T20:00',g6:'2026-06-20T20:00',
     g7:'2026-06-11T18:00',g8:'2026-06-12T18:00',g9:'2026-06-16T15:00',g10:'2026-06-17T00:00',g11:'2026-06-21T20:00',g12:'2026-06-21T20:00',
