@@ -91,6 +91,12 @@ body{font-family:'Barlow',sans-serif;background:var(--dark);color:var(--light);m
 .group-table-btn{background:rgba(255,255,255,.07);border:1px solid var(--border);color:var(--muted);font-size:13px;padding:2px 8px;border-radius:6px;cursor:pointer;margin-left:auto;transition:all .15s;line-height:1;font-family:inherit}
 .group-table-btn:hover{background:rgba(255,255,255,.15);color:#fff;border-color:rgba(255,255,255,.3)}
 
+/* SAVE PREDICTIONS BUTTON */
+.save-preds-btn{margin-left:auto;padding:7px 18px;border-radius:999px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;transition:all .2s;white-space:nowrap}
+.save-preds-btn.dirty{background:var(--yellow);color:#000;border-color:var(--yellow);animation:savePulse 2s ease-in-out infinite}
+.save-preds-btn:not(.dirty){cursor:default}
+@keyframes savePulse{0%,100%{box-shadow:0 0 0 0 rgba(255,209,0,.4)}50%{box-shadow:0 0 0 6px rgba(255,209,0,0)}}
+
 /* GROUP TABS */
 .group-tabs-wrap{margin-bottom:1rem}
 .group-tabs{display:flex;gap:5px;flex-wrap:wrap}
@@ -773,6 +779,7 @@ let view = 'home';        // home | player | leaderboard | admin
 let currentPlayer = null; // player id
 let currentPhase  = 'grupos';
 let currentGroup  = null; // active group tab when in fase de grupos
+let dirtyPreds    = false; // unsaved prediction changes
 let adminAuthed   = false;
 let modalOpen     = null; // 'addPlayer' | 'playerPin' | 'scoringInfo' | 'groupTable'
 let groupTableFor = null; // grupo name when modalOpen === 'groupTable'
@@ -954,6 +961,9 @@ function renderPlayer() {
         <span class="accent" style="background:${ph.locked ? 'var(--red)' : 'var(--green)'}"></span>
         ${ph.label}
         ${ph.locked ? '<span class="badge badge-red">Cerrada</span>' : '<span class="badge badge-green">Abierta</span>'}
+        ${!ph.locked ? `<button class="save-preds-btn${dirtyPreds ? ' dirty' : ''}" data-action="savePredictions" id="save-preds-btn">
+          ${dirtyPreds ? '💾 Grabar cambios' : '✅ Guardado'}
+        </button>` : ''}
       </div>
       <div id="matches-container">${matchesHTML}</div>
     </div>`;
@@ -1390,8 +1400,10 @@ function bindEvents() {
   // Phase tabs
   document.querySelectorAll('[data-phase]').forEach(el =>
     el.addEventListener('click', () => {
+      if (dirtyPreds && !confirm('Tenés cambios sin guardar en esta fase. ¿Cambiar sin grabar?')) return;
+      dirtyPreds = false;
       currentPhase = el.dataset.phase;
-      currentGroup = null; // reset group on phase change
+      currentGroup = null;
       render();
     })
   );
@@ -1408,15 +1420,17 @@ function bindEvents() {
 
   // Prediction inputs
   document.querySelectorAll('[data-pred]').forEach(input => {
-    input.addEventListener('change', async () => {
+    input.addEventListener('change', () => {
       const val = input.value === '' ? null : parseInt(input.value);
       const player = state.players.find(p => p.id === currentPlayer);
       if (!player) return;
       if (!player.predictions[input.dataset.pred]) player.predictions[input.dataset.pred] = { home: null, away: null };
       player.predictions[input.dataset.pred][input.dataset.side] = val;
-      const pred = player.predictions[input.dataset.pred];
-      if (pred.home !== null && pred.away !== null) {
-        await DB.upsertPrediction(currentPlayer, input.dataset.pred, pred.home, pred.away);
+      // Mark dirty without re-rendering the whole page — just update button UI
+      if (!dirtyPreds) {
+        dirtyPreds = true;
+        const btn = document.getElementById('save-preds-btn');
+        if (btn) { btn.classList.add('dirty'); btn.textContent = '💾 Grabar cambios'; }
       }
     });
   });
@@ -1466,7 +1480,12 @@ function handleAction() {
   const a = this.dataset.action;
 
   // ---- NAVIGATION ----
-  if (a === 'goHome')            { view = 'home'; currentPlayer = null; render(); }
+  if (a === 'goHome')            {
+    if (dirtyPreds && !confirm('Tenés cambios sin guardar. ¿Salir sin grabar?')) return;
+    dirtyPreds = false;
+    view = 'home'; currentPlayer = null; render();
+  }
+  else if (a === 'savePredictions') { savePredictions(); }
   else if (a === 'openScoringInfo') { modalOpen = 'scoringInfo'; render(); }
   else if (a === 'closeScoringInfo') { modalOpen = null; render(); }
   else if (a === 'openGroupTable') { groupTableFor = this.dataset.group; modalOpen = 'groupTable'; render(); }
@@ -1540,6 +1559,61 @@ function doAdminLogin() {
   const f = document.getElementById('admin-pin-field');
   if (f && f.value === state.adminPin) { adminAuthed = true; render(); }
   else alert('PIN incorrecto.');
+}
+
+async function savePredictions() {
+  if (!dirtyPreds) return;
+  const btn = document.getElementById('save-preds-btn');
+  if (btn) { btn.textContent = '⏳ Grabando...'; btn.disabled = true; btn.classList.add('dirty'); }
+  syncStatus('saving', 'Guardando pronósticos...');
+
+  const player = state.players.find(p => p.id === currentPlayer);
+  if (!player) return;
+
+  // Upsert all predictions that have both home and away filled
+  const toSave = Object.entries(player.predictions)
+    .filter(([, pred]) => pred.home !== null && pred.away !== null);
+
+  try {
+    // Batch upsert in one call
+    if (toSave.length > 0) {
+      const rows = toSave.map(([match_id, pred]) => ({
+        player_id: currentPlayer,
+        match_id,
+        home_goals: pred.home,
+        away_goals: pred.away,
+      }));
+      await DB._fetch('prode_predictions', {
+        method: 'POST',
+        headers: DB._h({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
+        body: JSON.stringify(rows),
+      });
+    }
+    dirtyPreds = false;
+    syncStatus('ok', `${toSave.length} pronósticos guardados ✓`);
+    // Update button UI without full re-render
+    if (btn) {
+      btn.textContent = '✅ Guardado';
+      btn.classList.remove('dirty');
+      btn.disabled = false;
+    }
+    // Re-render group tabs to update completion indicators
+    const ph = state.phases.find(p => p.id === currentPhase);
+    if (ph?.hasGroups) {
+      const tabEls = document.querySelectorAll('[data-groupsel]');
+      tabEls.forEach(tab => {
+        const grp = tab.dataset.groupsel;
+        const preds = player.predictions;
+        const ms = ph.matches.filter(m => m.group === grp);
+        const filled = ms.filter(m => preds[m.id]?.home != null && preds[m.id]?.away != null).length;
+        const status = filled === ms.length ? 'gtab-complete' : filled > 0 ? 'gtab-partial' : 'gtab-empty';
+        tab.className = tab.className.replace(/gtab-\w+/, status);
+      });
+    }
+  } catch (e) {
+    syncStatus('error', 'Error al guardar');
+    if (btn) { btn.textContent = '💾 Grabar cambios'; btn.disabled = false; }
+  }
 }
 
 async function adminSaveResults() {
