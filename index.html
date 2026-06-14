@@ -258,6 +258,65 @@ body{font-family:'Barlow',sans-serif;background:var(--dark);color:var(--light);m
 .ex-pill.partial{background:rgba(255,209,0,.15);color:var(--yellow);border:1px solid rgba(255,209,0,.4)}
 .ex-pill.miss{background:rgba(232,0,29,.15);color:#ff6b7a;border:1px solid rgba(232,0,29,.3)}
 
+/* CALENDAR */
+.cal-dates-wrap{position:relative;margin-bottom:1.5rem}
+.cal-dates{display:flex;gap:6px;overflow-x:auto;padding:.5rem 0 .75rem;scrollbar-width:none;scroll-behavior:smooth}
+.cal-dates::-webkit-scrollbar{display:none}
+.cal-pill{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 10px;border-radius:12px;border:1px solid var(--border);background:rgba(255,255,255,.04);cursor:pointer;transition:all .18s;min-width:52px}
+.cal-pill:hover{border-color:rgba(255,255,255,.3);background:rgba(255,255,255,.08)}
+.cal-pill.active{background:var(--yellow);border-color:var(--yellow)}
+.cal-pill.today:not(.active){border-color:rgba(255,209,0,.4);background:rgba(255,209,0,.07)}
+.cal-pill.has-matches:not(.active) .cal-dot{background:var(--yellow)}
+.cal-pill-day{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);line-height:1}
+.cal-pill.active .cal-pill-day{color:rgba(0,0,0,.6)}
+.cal-pill.today:not(.active) .cal-pill-day{color:var(--yellow)}
+.cal-pill-num{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;color:#fff;line-height:1}
+.cal-pill.active .cal-pill-num{color:#000}
+.cal-pill-mon{font-family:'Barlow Condensed',sans-serif;font-size:9px;font-weight:700;text-transform:uppercase;color:var(--muted);letter-spacing:.4px;line-height:1}
+.cal-pill.active .cal-pill-mon{color:rgba(0,0,0,.5)}
+.cal-dot{width:5px;height:5px;border-radius:50%;background:transparent;margin-top:2px;transition:background .2s}
+.cal-section-label{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--muted);padding:0 0 8px;display:flex;align-items:center;gap:8px}
+.cal-section-label::after{content:'';flex:1;height:1px;background:var(--border)}
+.cal-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:1rem}
+.cal-card{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.2rem;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
+.cal-card:hover{border-color:rgba(255,255,255,.25);background:rgba(255,255,255,.08);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.3)}
+.cal-card.finished{border-left:3px solid var(--green)}
+.cal-card.live{border-left:3px solid var(--red);animation:livePulse 2s ease-in-out infinite}
+@keyframes livePulse{0%,100%{border-color:var(--red)}50%{border-color:rgba(232,0,29,.3)}}
+.cal-card-time{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:.6rem;display:flex;align-items:center;gap:6px}
+.cal-card-time .phase-lbl{background:rgba(255,255,255,.08);border:1px solid var(--border);border-radius:4px;padding:1px 7px;font-size:10px;color:var(--muted)}
+.cal-card-time .live-badge{background:var(--red);color:#fff;border-radius:4px;padding:1px 7px;font-size:10px;animation:livePulse 1.5s ease-in-out infinite}
+.cal-card-teams{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px}
+.cal-team{display:flex;align-items:center;gap:8px}
+.cal-team.right{flex-direction:row-reverse;text-align:right}
+.cal-team-name{font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:800;color:#fff;text-transform:uppercase;letter-spacing:.3px;line-height:1.2}
+.cal-score{display:flex;flex-direction:column;align-items:center;gap:2px}
+.cal-score-nums{font-family:'Barlow Condensed',sans-serif;font-size:26px;font-weight:900;color:#fff;display:flex;align-items:center;gap:5px;line-height:1}
+.cal-score-nums.finished{color:var(--green)}
+.cal-score-sep{font-size:20px;color:var(--muted);font-weight:700}
+.cal-score-time{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:var(--yellow)}
+.cal-empty{text-align:center;padding:3rem 1rem;color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+
+/* CALENDAR MATCH MODAL */
+.cal-modal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem}
+.cal-modal-teams{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px;padding:1rem;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:1.25rem}
+.cal-modal-team{display:flex;flex-direction:column;align-items:center;gap:6px}
+.cal-modal-team.right{align-items:flex-end}
+.cal-modal-team.left{align-items:flex-start}
+.cal-modal-score{display:flex;flex-direction:column;align-items:center;gap:4px}
+.cal-modal-result{font-family:'Barlow Condensed',sans-serif;font-size:36px;font-weight:900;color:#fff;display:flex;align-items:center;gap:8px;line-height:1}
+.cal-modal-result.finished{color:var(--green)}
+.cal-modal-result-sep{color:var(--muted);font-size:28px}
+.cal-modal-meta{font-family:'Barlow Condensed',sans-serif;font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px;text-align:center}
+.cal-preds-table{width:100%;border-collapse:collapse}
+.cal-preds-table th{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);padding:5px 8px;border-bottom:1px solid var(--border);text-align:left}
+.cal-preds-table th.c{text-align:center}
+.cal-preds-table td{padding:10px 8px;border-bottom:1px solid rgba(255,255,255,.05);vertical-align:middle}
+.cal-preds-table tr:last-child td{border-bottom:none}
+.cal-pred-player{display:flex;align-items:center;gap:8px;font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:800;color:#fff;text-transform:uppercase}
+.cal-pred-score{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:900;color:#fff;text-align:center}
+.cal-pred-score.no-pred{color:rgba(255,255,255,.2);font-size:14px}
+
 /* SYNC BAR */
 .sync-bar{position:fixed;bottom:1.25rem;right:1.25rem;background:rgba(20,20,20,.95);border:1px solid var(--border);border-radius:999px;padding:8px 16px;font-size:11px;color:var(--muted);display:flex;align-items:center;gap:7px;box-shadow:0 8px 32px rgba(0,0,0,.6);z-index:100;font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:.5px;text-transform:uppercase;transition:all .3s;backdrop-filter:blur(8px)}
 .sync-bar.saving{color:var(--yellow);border-color:rgba(255,209,0,.3)}
@@ -775,7 +834,9 @@ function pillHTML(pred, actual) {
 // ============================================================
 // UI STATE
 // ============================================================
-let view = 'home';        // home | player | leaderboard | admin
+let view = 'home';        // home | player | leaderboard | admin | calendar
+let calendarDate = null;  // selected date string 'YYYY-MM-DD'
+let calendarMatch = null; // selected match id for modal
 let currentPlayer = null; // player id
 let currentPhase  = 'grupos';
 let currentGroup  = null; // active group tab when in fase de grupos
@@ -798,10 +859,12 @@ function render() {
   if (modalOpen === 'scoringInfo') html += renderScoringInfoModal();
   if (modalOpen === 'groupTable')  html += renderGroupTableModal();
   if (modalOpen === 'unsaved')     html += renderUnsavedModal();
+  if (modalOpen === 'calendarMatch') html += renderCalendarMatchModal();
   if      (view === 'home')        html += renderHome();
   else if (view === 'player')      html += renderPlayer();
   else if (view === 'leaderboard') html += renderLeaderboard();
   else if (view === 'admin')       html += renderAdmin();
+  else if (view === 'calendar')    html += renderCalendar();
   root.innerHTML = html;
   bindEvents();
 }
@@ -825,7 +888,7 @@ function renderHeader(sub = '') {
 function renderNav() {
   const btn = (v, label) =>
     `<button class="nav-btn${view === v ? ' active' : ''}" data-go="${v}">${label}</button>`;
-  return `<nav class="nav">${btn('home','Jugadores')}${btn('leaderboard','Tabla')}${btn('admin','⚙ Admin')}</nav>`;
+  return `<nav class="nav">${btn('home','Jugadores')}${btn('calendar','Calendario')}${btn('leaderboard','Tabla')}${btn('admin','⚙ Admin')}</nav>`;
 }
 
 // ——— HOME ———
@@ -1360,6 +1423,210 @@ function renderGroupTableModal() {
   </div>`;
 }
 
+// ============================================================
+// CALENDAR
+// ============================================================
+
+function getAllMatches() {
+  // Returns all matches across all phases, sorted by date
+  return state.phases.flatMap(ph =>
+    ph.matches.map(m => ({ ...m, phaseId: ph.id, phaseLabel: ph.label }))
+  ).filter(m => m.dt).sort((a, b) => a.dt.localeCompare(b.dt));
+}
+
+function matchDayKey(dtStr) {
+  // Returns 'YYYY-MM-DD' from dt string 'YYYY-MM-DDTHH:MM'
+  return dtStr.slice(0, 10);
+}
+
+function todayKey() {
+  // Today in Argentina time (UTC-3)
+  const now = new Date();
+  now.setHours(now.getHours() - 3);
+  const yyyy = now.getUTCFullYear();
+  const mm   = String(now.getUTCMonth() + 1).padStart(2, '0');
+  const dd   = String(now.getUTCDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function renderCalendar() {
+  const all      = getAllMatches();
+  const days     = [...new Set(all.map(m => matchDayKey(m.dt)))].sort();
+  const today    = todayKey();
+
+  // Init calendarDate to today or first match day
+  if (!calendarDate || !days.includes(calendarDate)) {
+    calendarDate = days.find(d => d >= today) || days[days.length - 1] || today;
+  }
+
+  const matchesOnDay = all.filter(m => matchDayKey(m.dt) === calendarDate);
+
+  // Group by phase for the section labels
+  const byPhase = {};
+  for (const m of matchesOnDay) {
+    if (!byPhase[m.phaseLabel]) byPhase[m.phaseLabel] = [];
+    byPhase[m.phaseLabel].push(m);
+  }
+
+  // Build date pills
+  const dias  = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  const meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const pills = days.map(d => {
+    const dt       = new Date(d + 'T12:00:00-03:00');
+    const dayName  = dias[dt.getDay()];
+    const dayNum   = dt.getDate();
+    const monName  = meses[dt.getMonth()];
+    const isActive = d === calendarDate;
+    const isToday  = d === today;
+    const hasMat   = all.some(m => matchDayKey(m.dt) === d);
+    return `<button class="cal-pill${isActive ? ' active' : ''}${isToday ? ' today' : ''}${hasMat ? ' has-matches' : ''}"
+      data-calday="${d}" id="cal-pill-${d}">
+      <span class="cal-pill-day">${dayName}</span>
+      <span class="cal-pill-num">${dayNum}</span>
+      <span class="cal-pill-mon">${monName}</span>
+      <span class="cal-dot"></span>
+    </button>`;
+  }).join('');
+
+  // Build match cards grouped by phase
+  let cardsHTML = '';
+  if (matchesOnDay.length === 0) {
+    cardsHTML = `<div class="cal-empty">No hay partidos este día</div>`;
+  } else {
+    for (const [phLabel, matches] of Object.entries(byPhase)) {
+      cardsHTML += `<div class="cal-section-label">${phLabel}</div>`;
+      cardsHTML += `<div class="cal-grid">${matches.map(m => renderCalCard(m)).join('')}</div>`;
+    }
+  }
+
+  return renderHeader('Calendario de partidos') + renderNav() + `
+    <div class="cal-dates-wrap">
+      <div class="cal-dates" id="cal-dates-scroll">${pills}</div>
+    </div>
+    ${cardsHTML}`;
+}
+
+function renderCalCard(m) {
+  const hasResult = m.result?.home != null && m.result?.away != null;
+  const timeStr   = m.dt ? m.dt.slice(11, 16) + ' hs' : '';
+  const phBadge   = `<span class="phase-lbl">${m.group || m.phaseLabel}</span>`;
+
+  const scoreHTML = hasResult
+    ? `<div class="cal-score-nums finished">${m.result.home}<span class="cal-score-sep">:</span>${m.result.away}</div>`
+    : `<div class="cal-score-time">${timeStr}</div>`;
+
+  return `<div class="cal-card${hasResult ? ' finished' : ''}" data-action="openCalMatch" data-mid="${m.id}">
+    <div class="cal-card-time">${phBadge}${hasResult ? '<span style="color:var(--green);font-weight:800;font-size:10px">✓ FINAL</span>' : timeStr}</div>
+    <div class="cal-card-teams">
+      <div class="cal-team">
+        ${flagHTML(m.home)}
+        <span class="cal-team-name">${esc(m.home)}</span>
+      </div>
+      <div class="cal-score">${scoreHTML}</div>
+      <div class="cal-team right">
+        <span class="cal-team-name">${esc(m.away)}</span>
+        ${flagHTML(m.away)}
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderCalendarMatchModal() {
+  // Find the match across all phases
+  const m = getAllMatches().find(x => x.id === calendarMatch);
+  if (!m) return '';
+
+  const hasResult = m.result?.home != null && m.result?.away != null;
+  const pal = playerColor(''); // fallback
+  const dias  = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  const meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  let dateStr = '';
+  if (m.dt) {
+    const d = new Date(m.dt + ':00-03:00');
+    dateStr = `${dias[d.getDay()]} ${d.getDate()} ${meses[d.getMonth()]} · ${m.dt.slice(11,16)} hs`;
+  }
+
+  // Result display
+  const resHome = hasResult ? m.result.home : '–';
+  const resAway = hasResult ? m.result.away : '–';
+
+  // Predictions for all players
+  const predRows = state.players.map(p => {
+    const pred = p.predictions?.[m.id];
+    const hasPred = pred?.home != null && pred?.away != null;
+    const pal2 = playerColor(p.name);
+
+    let pts = 0, pillHTML2 = '';
+    if (hasResult && hasPred) {
+      const { pts: mp, breakdown } = scoreMatch(pred, m.result);
+      pts = mp;
+      if (breakdown === 'exact') pillHTML2 = `<span class="result-pill exact">⭐ +5</span>`;
+      else if (pts > 0) {
+        const labels = breakdown.map(b => ({ winner:'gan', homeGoals:'loc', awayGoals:'vis' }[b] || b));
+        pillHTML2 = `<span class="result-pill partial">+${pts} · ${labels.join('+')}</span>`;
+      } else if (hasPred) pillHTML2 = `<span class="result-pill miss">0 pts</span>`;
+    }
+
+    const predScore = hasPred
+      ? `<span style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;color:#fff">${pred.home}–${pred.away}</span>`
+      : `<span style="font-family:'Barlow Condensed',sans-serif;font-size:16px;color:rgba(255,255,255,.2)">– : –</span>`;
+
+    return `<tr>
+      <td>
+        <div class="cal-pred-player">
+          <div style="width:28px;height:28px;border-radius:50%;background:${pal2.bg};color:${pal2.text};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;font-family:'Barlow Condensed',sans-serif;flex-shrink:0">${initials(p.name)}</div>
+          ${esc(p.name)}
+        </div>
+      </td>
+      <td style="text-align:center">${predScore}</td>
+      <td style="text-align:center">${pillHTML2}</td>
+    </tr>`;
+  }).join('');
+
+  return `<div class="overlay" id="overlay-cal-match">
+    <div class="modal" style="max-width:460px">
+      <div class="cal-modal-header">
+        <div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px">${m.group || m.phaseLabel}</div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;color:var(--muted);font-weight:600;margin-top:2px">${dateStr}</div>
+        </div>
+        <button class="modal-close" data-action="closeCalMatch">✕</button>
+      </div>
+
+      <!-- Teams & result -->
+      <div class="cal-modal-teams">
+        <div class="cal-modal-team left">
+          ${flagHTML(m.home)}
+          <span style="font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:800;color:#fff;text-transform:uppercase">${esc(m.home)}</span>
+        </div>
+        <div class="cal-modal-score">
+          <div class="cal-modal-result${hasResult ? ' finished' : ''}">
+            ${resHome}<span class="cal-modal-result-sep">:</span>${resAway}
+          </div>
+          ${hasResult ? '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;color:var(--green);font-weight:800;text-transform:uppercase;letter-spacing:.5px">Resultado final</div>' : `<div style="font-family:'Barlow Condensed',sans-serif;font-size:12px;color:var(--yellow);font-weight:700">${m.dt ? m.dt.slice(11,16)+' hs' : ''}</div>`}
+        </div>
+        <div class="cal-modal-team right">
+          ${flagHTML(m.away)}
+          <span style="font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:800;color:#fff;text-transform:uppercase">${esc(m.away)}</span>
+        </div>
+      </div>
+
+      <!-- Predictions table -->
+      ${state.players.length === 0
+        ? `<div class="empty" style="padding:1rem">No hay jugadores registrados</div>`
+        : `<table class="cal-preds-table">
+            <thead><tr>
+              <th>Jugador</th>
+              <th class="c">Pronóstico</th>
+              <th class="c">${hasResult ? 'Puntos' : ''}</th>
+            </tr></thead>
+            <tbody>${predRows}</tbody>
+          </table>`
+      }
+    </div>
+  </div>`;
+}
+
 function renderUnsavedModal() {
   return `<div class="overlay" id="overlay-unsaved">
     <div class="modal" style="max-width:360px;text-align:center">
@@ -1490,8 +1757,21 @@ function bindEvents() {
     if (e.key === 'Enter') doAdminLogin();
   });
 
-  // Close overlay on outside click
-  document.getElementById('overlay')?.addEventListener('click', e => {
+  // Calendar day pills
+  document.querySelectorAll('[data-calday]').forEach(el =>
+    el.addEventListener('click', () => { calendarDate = el.dataset.calday; render(); })
+  );
+
+  // Auto-scroll calendar to active pill
+  const activePill = document.getElementById(`cal-pill-${calendarDate}`);
+  if (activePill) {
+    setTimeout(() => activePill.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' }), 50);
+  }
+
+  // Close calendar match modal on outside click
+  document.getElementById('overlay-cal-match')?.addEventListener('click', e => {
+    if (e.target.id === 'overlay-cal-match') { modalOpen = null; calendarMatch = null; render(); }
+  });
     if (e.target.id === 'overlay') { modalOpen = null; currentPlayer = null; pinError = ''; render(); }
   });
   document.getElementById('overlay-unsaved')?.addEventListener('click', e => {
@@ -1519,7 +1799,12 @@ function handleAction() {
   }
   else if (a === 'savePredictions') { savePredictions(); }
   else if (a === 'openScoringInfo') { modalOpen = 'scoringInfo'; render(); }
-  else if (a === 'unsavedSaveAndContinue') { 
+  else if (a === 'openCalMatch') {
+    calendarMatch = this.dataset.mid;
+    modalOpen = 'calendarMatch';
+    render();
+  }
+  else if (a === 'closeCalMatch') { modalOpen = null; calendarMatch = null; render(); } 
     modalOpen = null;
     savePredictions().then(() => { if (pendingAction) { pendingAction(); pendingAction = null; } });
   }
