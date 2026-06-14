@@ -1772,9 +1772,9 @@ function bindEvents() {
   document.getElementById('overlay-cal-match')?.addEventListener('click', e => {
     if (e.target.id === 'overlay-cal-match') { modalOpen = null; calendarMatch = null; render(); }
   });
-    if (e.target.id === 'overlay') { modalOpen = null; currentPlayer = null; pinError = ''; render(); }
-  });
-  document.getElementById('overlay-unsaved')?.addEventListener('click', e => {
+
+  // Close overlay on outside click
+  document.getElementById('overlay')?.addEventListener('click', e => {
     if (e.target.id === 'overlay-unsaved') { modalOpen = null; pendingAction = null; render(); }
   });
   document.getElementById('overlay-scoring')?.addEventListener('click', e => {
