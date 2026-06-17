@@ -773,10 +773,13 @@ function teamHTML(name, side = 'left') {
 
 function fmtDate(dtStr) {
   if (!dtStr) return '';
+  // Las fechas están en horario Argentina (UTC-3).
+  // Parseamos con offset -03:00 y usamos getUTC* para que el resultado
+  // sea independiente del timezone del browser.
   const d = new Date(dtStr + ':00-03:00');
   const dias  = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
   const meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-  return `${dias[d.getDay()]} ${d.getDate()} ${meses[d.getMonth()]} · ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')} hs`;
+  return `${dias[d.getUTCDay()]} ${d.getUTCDate()} ${meses[d.getUTCMonth()]} · ${String(d.getUTCHours()).padStart(2,'0')}:${String(d.getUTCMinutes()).padStart(2,'0')} hs`;
 }
 
 // ============================================================
@@ -1440,12 +1443,13 @@ function matchDayKey(dtStr) {
 }
 
 function todayKey() {
-  // Today in Argentina time (UTC-3)
+  // Argentina = UTC-3. Usamos UTC y restamos 3 horas.
   const now = new Date();
-  now.setHours(now.getHours() - 3);
-  const yyyy = now.getUTCFullYear();
-  const mm   = String(now.getUTCMonth() + 1).padStart(2, '0');
-  const dd   = String(now.getUTCDate()).padStart(2, '0');
+  const argMs = now.getTime() - (3 * 60 * 60 * 1000);
+  const arg = new Date(argMs);
+  const yyyy = arg.getUTCFullYear();
+  const mm   = String(arg.getUTCMonth() + 1).padStart(2, '0');
+  const dd   = String(arg.getUTCDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
 }
 
@@ -1473,9 +1477,9 @@ function renderCalendar() {
   const meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
   const pills = days.map(d => {
     const dt       = new Date(d + 'T12:00:00-03:00');
-    const dayName  = dias[dt.getDay()];
-    const dayNum   = dt.getDate();
-    const monName  = meses[dt.getMonth()];
+    const dayName  = dias[dt.getUTCDay()];
+    const dayNum   = dt.getUTCDate();
+    const monName  = meses[dt.getUTCMonth()];
     const isActive = d === calendarDate;
     const isToday  = d === today;
     const hasMat   = all.some(m => matchDayKey(m.dt) === d);
@@ -1543,7 +1547,7 @@ function renderCalendarMatchModal() {
   let dateStr = '';
   if (m.dt) {
     const d = new Date(m.dt + ':00-03:00');
-    dateStr = `${dias[d.getDay()]} ${d.getDate()} ${meses[d.getMonth()]} · ${m.dt.slice(11,16)} hs`;
+    dateStr = `${dias[d.getUTCDay()]} ${d.getUTCDate()} ${meses[d.getUTCMonth()]} · ${m.dt.slice(11,16)} hs`;
   }
 
   // Result display
