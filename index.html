@@ -1688,7 +1688,12 @@ function readPin(containerId) {
 function bindEvents() {
   // Nav buttons
   document.querySelectorAll('[data-go]').forEach(el =>
-    el.addEventListener('click', () => { view = el.dataset.go; render(); })
+    el.addEventListener('click', () => {
+      const targetView = el.dataset.go;
+      const action = () => { dirtyPreds = false; view = targetView; render(); };
+      if (dirtyPreds) { pendingAction = action; modalOpen = 'unsaved'; render(); }
+      else action();
+    })
   );
 
   // Phase tabs
@@ -2069,16 +2074,6 @@ async function adminFetchResults() {
 }
 
 // ============================================================
-// POLLING
-// ============================================================
-function startPolling() {
-  setInterval(async () => {
-    const ok = await loadFromCloud();
-    if (ok) render();
-  }, 15000);
-}
-
-// ============================================================
 // INIT
 // ============================================================
 (async () => {
@@ -2086,7 +2081,8 @@ function startPolling() {
   const ok = await loadFromCloud();
   if (ok) render(); // re-render with real data
   syncStatus('ok', 'Conectado');
-  startPolling();
+  // Nota: sin polling automático — evita pisar cambios sin guardar.
+  // Los datos se refrescan al navegar entre pantallas o al grabar.
 })();
 </script>
 </body>
