@@ -1239,6 +1239,11 @@ function renderAdmin() {
       <div id="sync-info" style="margin-top:.75rem;font-size:12px;color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-weight:600"></div>
     </div>
     <div class="section">
+      <div class="section-title"><span class="accent" style="background:var(--purple)"></span>Reporte de pronósticos</div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:1rem;line-height:1.6">Exportá un CSV con los pronósticos de todos los jugadores para los partidos que todavía no tienen resultado, excluyendo fases con equipos sin definir.</p>
+      <div class="btn-row" style="margin-top:0"><button class="btn primary" data-action="exportPendingCSV">📄 Exportar pronósticos pendientes (CSV)</button></div>
+    </div>
+    <div class="section">
       <div class="section-title"><span class="accent" style="background:var(--blue)"></span>Fases</div>
       <div class="phase-tabs">${tabs}</div>
       <div class="btn-row" style="margin-top:0">
@@ -1433,6 +1438,52 @@ function getAllMatches() {
   return state.phases.flatMap(ph =>
     ph.matches.map(m => ({ ...m, phaseId: ph.id, phaseLabel: ph.label }))
   ).filter(m => m.dt).sort((a, b) => a.dt.localeCompare(b.dt));
+}
+
+function exportPendingCSV() {
+  const dias  = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  const meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+  const rows = [['Fecha','Local','Visitante','Jugador','Goles Local','Goles Visitante']];
+
+  const all = getAllMatches();
+  const pending = all.filter(m => {
+    const hasResult = m.result && m.result.home != null && m.result.away != null;
+    if (hasResult) return false;
+    if (isPlaceholder(m.home) || isPlaceholder(m.away)) return false;
+    return true;
+  });
+
+  for (const m of pending) {
+    let fecha = '';
+    if (m.dt) {
+      const d = new Date(m.dt + ':00-03:00');
+      fecha = dias[d.getUTCDay()] + ' ' + d.getUTCDate() + ' ' + meses[d.getUTCMonth()] + ' ' + m.dt.slice(11,16) + ' hs';
+    }
+    for (const p of state.players) {
+      const pred = p.predictions ? p.predictions[m.id] : null;
+      const gl = pred && pred.home != null ? pred.home : '';
+      const gv = pred && pred.away != null ? pred.away : '';
+      rows.push([fecha, m.home, m.away, p.name, gl, gv]);
+    }
+  }
+
+  const csvEscape = v => {
+    const s = String(v);
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+  };
+  const csv = rows.map(r => r.map(csvEscape).join(',')).join('\r\n');
+
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const today = new Date().toISOString().slice(0,10);
+  a.href = url;
+  a.download = `pronosticos-pendientes-${today}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 function matchDayKey(dtStr) {
@@ -1853,6 +1904,7 @@ function handleAction() {
   else if (a === 'changePin')    { adminChangePin(this.dataset.pid); }
   else if (a === 'saveAdminPin') { adminSavePin(); }
   else if (a === 'fetchResults') { adminFetchResults(); }
+  else if (a === 'exportPendingCSV') { exportPendingCSV(); }
 }
 
 // ============================================================
