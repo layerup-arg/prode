@@ -386,7 +386,8 @@ const DB = {
   },
 
   async loadAll() {
-    const [pRes, predRes, resRes, phRes, setRes] = await Promise.all([
+    const [mRes, pRes, predRes, resRes, phRes, setRes] = await Promise.all([
+      this._fetch('prode_matches?select=id,fd_id,group_name,phase_id,home_team,away_team,kickoff_at', { headers: this._h() }),
       this._fetch('prode_players?select=id,name,pin&order=created_at', { headers: this._h() }),
       this._fetch('prode_predictions?select=player_id,match_id,home_goals,away_goals', { headers: this._h() }),
       this._fetch('prode_results?select=match_id,home_goals,away_goals', { headers: this._h() }),
@@ -400,7 +401,8 @@ const DB = {
     const phases     = phRes.ok   ? await phRes.json()   : [];
     const settings   = setRes.ok  ? await setRes.json()  : [];
 
-    return { players, preds, results, phases, settings };
+    const matches = mRes.ok ? await mRes.json() : [];
+    return { matches, players, preds, results, phases, settings };
   },
 
   async upsertPlayer(player) {
@@ -428,6 +430,14 @@ const DB = {
       method: 'POST',
       headers: this._h({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
       body: JSON.stringify({ player_id: playerId, match_id: matchId, home_goals: homeGoals, away_goals: awayGoals }),
+    });
+  },
+
+  async updateMatchTeams(matchId, homeTeam, awayTeam) {
+    return this._fetch(`prode_matches?id=eq.${matchId}`, {
+      method: 'PATCH',
+      headers: this._h({ Prefer: 'return=minimal' }),
+      body: JSON.stringify({ home_team: homeTeam, away_team: awayTeam }),
     });
   },
 
@@ -691,7 +701,7 @@ function syncStatus(type, msg) {
 // ============================================================
 async function loadFromCloud() {
   try {
-    const { players, preds, results, phases, settings } = await DB.loadAll();
+    const { matches, players, preds, results, phases, settings } = await DB.loadAll();
 
     // Build prediction map: { playerId: { matchId: {home, away} } }
     const predMap = {};
@@ -711,12 +721,38 @@ async function loadFromCloud() {
     // Populate state.players with their predictions
     state.players = players.map(p => ({ ...p, predictions: predMap[p.id] || {} }));
 
-    // Populate state.phases using DEFAULT_PHASES as template, overlaying DB data
-    state.phases = DEFAULT_PHASES.map(ph => ({
-      ...ph,
-      locked: lockMap[ph.id] ?? ph.locked,
-      matches: ph.matches.map(m => ({ ...m, result: resMap[m.id] || null })),
-    }));
+    // Build state.phases from prode_matches (source of truth), falling back to
+    // DEFAULT_PHASES metadata (label, hasGroups) which doesn't change.
+    const matchesByPhase = {};
+    for (const m of matches) {
+      if (!matchesByPhase[m.phase_id]) matchesByPhase[m.phase_id] = [];
+      matchesByPhase[m.phase_id].push({
+        id: m.id,
+        fdId: m.fd_id,
+        group: m.group_name,
+        home: m.home_team,
+        away: m.away_team,
+        dt: m.kickoff_at ? m.kickoff_at.slice(0, 16) : null,
+        result: resMap[m.id] || null,
+      });
+    }
+
+    if (matches.length > 0) {
+      state.phases = DEFAULT_PHASES.map(ph => ({
+        id: ph.id,
+        label: ph.label,
+        hasGroups: ph.hasGroups,
+        locked: lockMap[ph.id] ?? ph.locked,
+        matches: (matchesByPhase[ph.id] || []).sort((a, b) => (a.dt || '').localeCompare(b.dt || '')),
+      }));
+    } else {
+      // Fallback: prode_matches not reachable/empty, use hardcoded defaults
+      state.phases = DEFAULT_PHASES.map(ph => ({
+        ...ph,
+        locked: lockMap[ph.id] ?? ph.locked,
+        matches: ph.matches.map(m => ({ ...m, result: resMap[m.id] || null })),
+      }));
+    }
 
     // Apply settings
     const pinRow = settings.find(s => s.key === 'adminPin');
@@ -2085,6 +2121,7 @@ async function adminFetchResults() {
       .replace(/\s+/g, ' ').trim();
 
     let changed = 0;
+  const teamUpdates = new Set();
     for (const ph of state.phases) {
       for (const m of ph.matches) {
         if (m.result) continue;
@@ -2101,8 +2138,8 @@ async function adminFetchResults() {
           const apiMatch = byId[m.fdId];
           const toES = en => Object.entries(TEAM_EN).find(([,v]) => norm(v) === norm(en))?.[0] || en;
           const nh = toES(apiMatch.homeTeam?.name || ''), na = toES(apiMatch.awayTeam?.name || '');
-          if (nh && !isPlaceholder(nh) && nh !== m.home) { m.home = nh; changed++; }
-          if (na && !isPlaceholder(na) && na !== m.away) { m.away = na; changed++; }
+          if (nh && !isPlaceholder(nh) && nh !== m.home) { m.home = nh; changed++; teamUpdates.add(m.id); }
+          if (na && !isPlaceholder(na) && na !== m.away) { m.away = na; changed++; teamUpdates.add(m.id); }
         }
       }
     }
@@ -2114,6 +2151,10 @@ async function adminFetchResults() {
 
     if (changed > 0) {
       for (const ph of state.phases) await DB.upsertResults(ph.matches);
+      for (const mid of teamUpdates) {
+        const mm = state.phases.flatMap(p => p.matches).find(x => x.id === mid);
+        if (mm) await DB.updateMatchTeams(mid, mm.home, mm.away);
+      }
       render();
     }
     syncStatus('ok', changed > 0 ? 'Actualizado ✓' : 'Sin cambios');
