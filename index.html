@@ -1275,6 +1275,11 @@ function renderAdmin() {
       <div id="sync-info" style="margin-top:.75rem;font-size:12px;color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-weight:600"></div>
     </div>
     <div class="section">
+      <div class="section-title"><span class="accent" style="background:var(--green)"></span>Clasificados eliminatorias</div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:1rem;line-height:1.6">Calcula los clasificados de cada grupo usando los resultados ya cargados y completa automáticamente los partidos de eliminatorias. Solo aplica a grupos con todos los resultados cargados.</p>
+      <div class="btn-row" style="margin-top:0"><button class="btn primary" data-action="resolveKnockout">🏆 Resolver clasificados</button></div>
+    </div>
+    <div class="section">
       <div class="section-title"><span class="accent" style="background:var(--purple)"></span>Reporte de pronósticos</div>
       <p style="font-size:13px;color:var(--muted);margin-bottom:1rem;line-height:1.6">Exportá un CSV con los pronósticos de todos los jugadores para los partidos que todavía no tienen resultado, excluyendo fases con equipos sin definir.</p>
       <div class="btn-row" style="margin-top:0"><button class="btn primary" data-action="exportPendingCSV">📄 Exportar pronósticos pendientes (CSV)</button></div>
@@ -1940,6 +1945,7 @@ function handleAction() {
   else if (a === 'changePin')    { adminChangePin(this.dataset.pid); }
   else if (a === 'saveAdminPin') { adminSavePin(); }
   else if (a === 'fetchResults') { adminFetchResults(); }
+  else if (a === 'resolveKnockout') { resolveKnockoutTeams(); }
   else if (a === 'exportPendingCSV') { exportPendingCSV(); }
 }
 
@@ -2091,6 +2097,127 @@ async function adminChangePin(pid) {
   render();
   await DB.updatePlayerPin(pid, newPin);
   alert(`✅ PIN de ${player.name} actualizado.`);
+}
+
+async function resolveKnockoutTeams() {
+  // ─────────────────────────────────────────────────────────────
+  // 1. Build real standings from prode_results (not predictions)
+  // ─────────────────────────────────────────────────────────────
+  const gruposPh = state.phases.find(p => p.hasGroups);
+  if (!gruposPh) { alert('No se encontró la fase de grupos.'); return; }
+
+  // group_name → { team → stats }
+  const standingsByGroup = {};
+  for (const m of gruposPh.matches) {
+    if (!m.result) continue;
+    const grp = m.group;
+    if (!standingsByGroup[grp]) standingsByGroup[grp] = {};
+    const s = standingsByGroup[grp];
+    for (const t of [m.home, m.away]) if (!s[t]) s[t] = { team:t, pts:0, w:0, d:0, l:0, gf:0, ga:0, gd:0, played:0 };
+    const h = m.result.home, a = m.result.away;
+    s[m.home].played++; s[m.away].played++;
+    s[m.home].gf += h; s[m.home].ga += a; s[m.home].gd += h - a;
+    s[m.away].gf += a; s[m.away].ga += h; s[m.away].gd += a - h;
+    if      (h > a) { s[m.home].pts += 3; s[m.home].w++; s[m.away].l++; }
+    else if (h < a) { s[m.away].pts += 3; s[m.away].w++; s[m.home].l++; }
+    else            { s[m.home].pts += 1; s[m.away].pts += 1; s[m.home].d++; s[m.away].d++; }
+  }
+
+  // Sort each group: pts > gd > gf > name (simplified, without head-to-head)
+  const sortedGroups = {}; // 'Grupo A' → [1st, 2nd, 3rd, 4th]
+  for (const [grp, teams] of Object.entries(standingsByGroup)) {
+    sortedGroups[grp] = Object.values(teams).sort(
+      (a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf || a.team.localeCompare(b.team)
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // 2. Identify the best 8 third-placed teams (FIFA World Cup 2026 rules)
+  //    All 12 third-placed teams compete; best 8 by pts > gd > gf > name qualify.
+  // ─────────────────────────────────────────────────────────────
+  const thirdPlaced = Object.entries(sortedGroups)
+    .filter(([, rows]) => rows.length >= 3)
+    .map(([grp, rows]) => ({ ...rows[2], grp }))
+    .sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf || a.team.localeCompare(b.team));
+
+  const best8thirds = thirdPlaced.slice(0, 8).map(t => t.grp); // groups whose 3rd qualifies
+
+  // ─────────────────────────────────────────────────────────────
+  // 3. Resolver: turn a placeholder string into a team name
+  // ─────────────────────────────────────────────────────────────
+  function resolveSlot(placeholder) {
+    if (!isPlaceholder(placeholder)) return null; // already resolved
+
+    const p = placeholder.trim();
+
+    // "1º Grupo A", "2º Grupo B", "3º Grupo A"
+    const posMatch = p.match(/^(\d)º\s+Grupo\s+([A-L])$/);
+    if (posMatch) {
+      const pos  = parseInt(posMatch[1]) - 1; // 0-based
+      const grp  = 'Grupo ' + posMatch[2];
+      const rows = sortedGroups[grp];
+      if (!rows || rows.length <= pos) return null;
+      // Only return if that group is fully played (all 6 matches have results)
+      const groupMatches = gruposPh.matches.filter(m => m.group === grp);
+      const played = groupMatches.filter(m => m.result).length;
+      if (played < 6) return null; // group not finished yet
+      return rows[pos].team;
+    }
+
+    // "3º G A/B/C/D/F" — best third from those groups
+    const thirdMatch = p.match(/^3º\s+G\s+([A-L\/]+)$/);
+    if (thirdMatch) {
+      const eligibleGroups = thirdMatch[1].split('/').map(g => 'Grupo ' + g);
+      // Find the best qualified third that came from one of these eligible groups
+      const qualified = thirdPlaced.filter(t =>
+        best8thirds.includes(t.grp) && eligibleGroups.includes(t.grp)
+      ).sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf || a.team.localeCompare(b.team));
+      if (qualified.length === 0) return null;
+      // Check all relevant groups are finished
+      const allFinished = eligibleGroups.every(grp => {
+        const ms = gruposPh.matches.filter(m => m.group === grp);
+        return ms.length > 0 && ms.filter(m => m.result).length === ms.length;
+      });
+      if (!allFinished) return null;
+      return qualified[0].team;
+    }
+
+    return null;
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // 4. Apply resolutions to prode_matches
+  // ─────────────────────────────────────────────────────────────
+  const updates = [];
+  for (const ph of state.phases) {
+    if (ph.hasGroups) continue; // skip group phase
+    for (const m of ph.matches) {
+      let changed = false;
+      let newHome = m.home, newAway = m.away;
+      const rh = resolveSlot(m.home);
+      const ra = resolveSlot(m.away);
+      if (rh) { newHome = rh; changed = true; }
+      if (ra) { newAway = ra; changed = true; }
+      if (changed) {
+        m.home = newHome;
+        m.away = newAway;
+        updates.push({ id: m.id, home: newHome, away: newAway });
+      }
+    }
+  }
+
+  if (updates.length === 0) {
+    alert('No hay clasificados nuevos para resolver todavía. ¿Están todos los resultados de grupos cargados?');
+    return;
+  }
+
+  // Persist to prode_matches
+  for (const u of updates) {
+    await DB.updateMatchTeams(u.id, u.home, u.away);
+  }
+
+  alert(`✅ ${updates.length} equipos clasificados actualizados en la base de datos.`);
+  render();
 }
 
 async function adminSavePin() {
