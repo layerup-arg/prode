@@ -633,22 +633,22 @@ function makeKO(list) {
 const DEFAULT_PHASES = [
   { id: 'grupos',  label: 'Fase de grupos',   locked: false, hasGroups: true,  matches: makeGroups() },
   { id: 'last32',  label: 'Ronda de 32',       locked: true,  hasGroups: false, matches: makeKO([
-    {id:'ko_73',fdId:537417,home:'2º Grupo A',away:'2º Grupo B',dt:'2026-06-28T16:00'},
-    {id:'ko_76',fdId:537423,home:'1º Grupo C',away:'2º Grupo F',dt:'2026-06-29T14:00'},
-    {id:'ko_74',fdId:537415,home:'1º Grupo E',away:'3º G A/B/C/D/F',dt:'2026-06-29T17:30'},
-    {id:'ko_75',fdId:537418,home:'1º Grupo F',away:'2º Grupo C',dt:'2026-06-29T22:00'},
-    {id:'ko_78',fdId:537424,home:'2º Grupo E',away:'2º Grupo I',dt:'2026-06-30T14:00'},
-    {id:'ko_77',fdId:537416,home:'1º Grupo I',away:'3º G C/D/F/G/H',dt:'2026-06-30T18:00'},
-    {id:'ko_79',fdId:537425,home:'1º Grupo A',away:'3º G C/E/F/H/I',dt:'2026-06-30T22:00'},
-    {id:'ko_80',fdId:537426,home:'1º Grupo L',away:'3º G E/H/I/J/K',dt:'2026-07-01T13:00'},
-    {id:'ko_82',fdId:537422,home:'1º Grupo G',away:'3º G A/E/H/I/J',dt:'2026-07-01T17:00'},
-    {id:'ko_81',fdId:537421,home:'1º Grupo D',away:'3º G B/E/F/I/J',dt:'2026-07-01T21:00'},
-    {id:'ko_84',fdId:537420,home:'1º Grupo H',away:'2º Grupo J',dt:'2026-07-02T16:00'},
-    {id:'ko_83',fdId:537419,home:'2º Grupo K',away:'2º Grupo L',dt:'2026-07-02T20:00'},
-    {id:'ko_85',fdId:537429,home:'1º Grupo B',away:'3º G E/F/G/I/J',dt:'2026-07-03T00:00'},
-    {id:'ko_88',fdId:537428,home:'2º Grupo D',away:'2º Grupo G',dt:'2026-07-03T13:00'},
-    {id:'ko_86',fdId:537427,home:'1º Grupo J',away:'2º Grupo H',dt:'2026-07-03T17:00'},
-    {id:'ko_87',fdId:537430,home:'1º Grupo K',away:'2º G G/H/K/L',dt:'2026-07-03T21:00'},
+    {id:'ko_73',fdId:537417,home:'Sudáfrica',           away:'Canadá',             dt:'2026-06-28T16:00'},
+    {id:'ko_76',fdId:537423,home:'Brasil',              away:'Japón',              dt:'2026-06-29T14:00'},
+    {id:'ko_74',fdId:537415,home:'Alemania',            away:'Paraguay',           dt:'2026-06-29T17:30'},
+    {id:'ko_75',fdId:537418,home:'Países Bajos',        away:'Marruecos',          dt:'2026-06-29T22:00'},
+    {id:'ko_78',fdId:537424,home:'Costa de Marfil',     away:'Noruega',            dt:'2026-06-30T14:00'},
+    {id:'ko_77',fdId:537416,home:'Francia',             away:'Suecia',             dt:'2026-06-30T18:00'},
+    {id:'ko_79',fdId:537425,home:'México',              away:'Ecuador',            dt:'2026-06-30T22:00'},
+    {id:'ko_80',fdId:537426,home:'Inglaterra',          away:'Congo RD',           dt:'2026-07-01T13:00'},
+    {id:'ko_82',fdId:537422,home:'Bélgica',             away:'Senegal',            dt:'2026-07-01T17:00'},
+    {id:'ko_81',fdId:537421,home:'Estados Unidos',      away:'Bosnia-Herzegovina', dt:'2026-07-01T21:00'},
+    {id:'ko_84',fdId:537420,home:'España',              away:'Austria',            dt:'2026-07-02T16:00'},
+    {id:'ko_83',fdId:537419,home:'Portugal',            away:'Croacia',            dt:'2026-07-02T20:00'},
+    {id:'ko_85',fdId:537429,home:'Suiza',               away:'Argelia',            dt:'2026-07-03T00:00'},
+    {id:'ko_88',fdId:537428,home:'Australia',           away:'Egipto',             dt:'2026-07-03T15:00'},
+    {id:'ko_86',fdId:537427,home:'Argentina',           away:'Cabo Verde',         dt:'2026-07-03T19:00'},
+    {id:'ko_87',fdId:537430,home:'Colombia',            away:'Ghana',              dt:'2026-07-03T22:30'},
   ])},
   { id: 'last16',  label: 'Octavos de final',  locked: true,  hasGroups: false, matches: makeKO([
     {id:'ko_89',fdId:537376,home:'Gan. M73',away:'Gan. M76',dt:'2026-07-04T14:00'},
@@ -2099,6 +2099,29 @@ async function adminChangePin(pid) {
   alert(`✅ PIN de ${player.name} actualizado.`);
 }
 
+async function syncLast32Teams() {
+  // Sync confirmed team names from DEFAULT_PHASES (hardcoded source for KO)
+  // into prode_matches. Only updates rows where name changed from placeholder.
+  const updates = [];
+  for (const ph of DEFAULT_PHASES) {
+    if (ph.hasGroups) continue;
+    for (const m of ph.matches) {
+      const liveMatch = state.phases.flatMap(p => p.matches).find(x => x.id === m.id);
+      if (!liveMatch) continue;
+      const homeChanged = !isPlaceholder(m.home) && m.home !== liveMatch.home;
+      const awayChanged = !isPlaceholder(m.away) && m.away !== liveMatch.away;
+      if (homeChanged || awayChanged) {
+        const newHome = homeChanged ? m.home : liveMatch.home;
+        const newAway = awayChanged ? m.away : liveMatch.away;
+        liveMatch.home = newHome;
+        liveMatch.away = newAway;
+        updates.push(DB.updateMatchTeams(m.id, newHome, newAway));
+      }
+    }
+  }
+  if (updates.length > 0) await Promise.all(updates);
+}
+
 async function resolveKnockoutTeams() {
   // ─────────────────────────────────────────────────────────────
   // 1. Build real standings from prode_results (not predictions)
@@ -2299,7 +2322,11 @@ async function adminFetchResults() {
 (async () => {
   render(); // render immediately with empty state
   const ok = await loadFromCloud();
-  if (ok) render(); // re-render with real data
+  if (ok) {
+    // Sync confirmed last32 teams to prode_matches if still placeholders
+    await syncLast32Teams();
+    render();
+  }
   syncStatus('ok', 'Conectado');
   // Nota: sin polling automático — evita pisar cambios sin guardar.
   // Los datos se refrescan al navegar entre pantallas o al grabar.
