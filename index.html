@@ -732,7 +732,13 @@ async function loadFromCloud() {
         group: m.group_name,
         home: m.home_team,
         away: m.away_team,
-        dt: m.kickoff_at ? m.kickoff_at.slice(0, 16) : null,
+        dt: m.kickoff_at ? (() => {
+          // Supabase almacena en UTC. Convertimos a hora Argentina (UTC-3).
+          const utcMs = new Date(m.kickoff_at).getTime();
+          const argD  = new Date(utcMs - 3 * 60 * 60 * 1000);
+          const pad   = n => String(n).padStart(2, '0');
+          return `${argD.getUTCFullYear()}-${pad(argD.getUTCMonth()+1)}-${pad(argD.getUTCDate())}T${pad(argD.getUTCHours())}:${pad(argD.getUTCMinutes())}`;
+        })() : null,
         result: resMap[m.id] || null,
       });
     }
