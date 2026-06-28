@@ -1277,7 +1277,10 @@ function renderAdmin() {
     <div class="section">
       <div class="section-title"><span class="accent" style="background:var(--green)"></span>Clasificados eliminatorias</div>
       <p style="font-size:13px;color:var(--muted);margin-bottom:1rem;line-height:1.6">Calcula los clasificados de cada grupo usando los resultados ya cargados y completa automáticamente los partidos de eliminatorias. Solo aplica a grupos con todos los resultados cargados.</p>
-      <div class="btn-row" style="margin-top:0"><button class="btn primary" data-action="resolveKnockout">🏆 Resolver clasificados</button></div>
+      <div class="btn-row" style="margin-top:0">
+        <button class="btn primary" data-action="resolveKnockout">🏆 Resolver clasificados</button>
+        <button class="btn" data-action="syncKOTeams">🔄 Sincronizar equipos KO</button>
+      </div>
     </div>
     <div class="section">
       <div class="section-title"><span class="accent" style="background:var(--purple)"></span>Reporte de pronósticos</div>
@@ -1946,6 +1949,7 @@ function handleAction() {
   else if (a === 'saveAdminPin') { adminSavePin(); }
   else if (a === 'fetchResults') { adminFetchResults(); }
   else if (a === 'resolveKnockout') { resolveKnockoutTeams(); }
+  else if (a === 'syncKOTeams')     { syncLast32Teams().then(() => { alert('✅ Equipos KO sincronizados.'); loadFromCloud().then(() => render()); }); }
   else if (a === 'exportPendingCSV') { exportPendingCSV(); }
 }
 
@@ -2322,11 +2326,7 @@ async function adminFetchResults() {
 (async () => {
   render(); // render immediately with empty state
   const ok = await loadFromCloud();
-  if (ok) {
-    // Sync confirmed last32 teams to prode_matches if still placeholders
-    await syncLast32Teams();
-    render();
-  }
+  if (ok) render(); // re-render with real data
   syncStatus('ok', 'Conectado');
   // Nota: sin polling automático — evita pisar cambios sin guardar.
   // Los datos se refrescan al navegar entre pantallas o al grabar.
